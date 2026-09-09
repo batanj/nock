@@ -1,3 +1,5 @@
+use nock::runtime;
+
 fn main() {
-    println!("nock");
+    runtime::run::run().expect("event loop failed");
 }
