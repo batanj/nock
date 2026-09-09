@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use crate::{Action, Budget, FrameMode};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SurfaceId(u32);
 
 pub struct Surface {

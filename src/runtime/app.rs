@@ -40,6 +40,17 @@ impl App {
             .get_mut(&id)
             .map(|surface| surface.on_frame(now))
     }
+
+    pub fn tick(&mut self, now: Instant) -> Vec<(SurfaceId, Action)> {
+        self.surfaces
+            .iter_mut()
+            .map(|(&surface_id, surface)| (surface_id, Surface::on_frame(surface, now)))
+            .collect()
+    }
+
+    pub fn remove_surface(&mut self, id: SurfaceId) -> bool {
+        self.surfaces.remove(&id).is_some()
+    }
 }
 
 #[cfg(test)]
@@ -83,5 +94,44 @@ mod tests {
     fn mark_unknown_is_false() {
         let mut app = App::default();
         assert!(!app.mark_dirty(SurfaceId::new(1)));
+    }
+
+    #[test]
+    fn tick_empty_is_empty() {
+        let mut app = App::default();
+        let now = Instant::now();
+
+        assert_eq!(app.tick(now), []);
+    }
+
+    #[test]
+    fn tick_reports_each_surface() {
+        let mut app = App::default();
+        let now = Instant::now();
+
+        let id1 = SurfaceId::new(1);
+        let id2 = SurfaceId::new(2);
+        app.add_surface(id1, FrameMode::Cap(60));
+        app.add_surface(id2, FrameMode::Cap(60));
+        app.mark_dirty(id1);
+
+        let got = app.tick(now);
+
+        assert!(got.contains(&(id1, Action::Paint)));
+        assert!(got.contains(&(id2, Action::Sleep)));
+        assert_eq!(got.len(), 2);
+    }
+
+    #[test]
+    fn remove_then_unkown() {
+        let mut app = App::default();
+        let now = Instant::now();
+
+        let id = SurfaceId::new(1);
+        app.add_surface(id, FrameMode::Cap(60));
+
+        assert!(app.remove_surface(id));
+        assert_eq!(app.on_frame(id, now), None);
+        assert!(!app.remove_surface(id));
     }
 }
