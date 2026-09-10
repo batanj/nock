@@ -156,6 +156,7 @@ name = "nock"
 version = "0.1.0"
 dependencies = [
  "calloop",
+ "calloop-wayland-source",
  "smithay-client-toolkit",
  "wayland-client",
 ]

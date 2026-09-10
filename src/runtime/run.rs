@@ -4,28 +4,65 @@ use calloop::{
     EventLoop,
     timer::{TimeoutAction, Timer},
 };
+use calloop_wayland_source::WaylandSource;
+use smithay_client_toolkit::{
+    compositor::CompositorState,
+    output::OutputState,
+    registry::RegistryState,
+    shell::{
+        WaylandSurface,
+        wlr_layer::{Anchor, Layer, LayerShell},
+    },
+    shm::{Shm, slot::SlotPool},
+};
+use wayland_client::{Connection, globals::registry_queue_init};
 
-use crate::{FrameMode, SurfaceId, runtime::app::App};
+use crate::{
+    FrameMode, SurfaceId,
+    runtime::{app::App, nock::Nock},
+};
 
 pub fn run() -> Result<(), Box<dyn Error>> {
+    let conn = Connection::connect_to_env()?;
+    let (globals, event_queue) = registry_queue_init::<Nock>(&conn)?;
+    let qh = event_queue.handle();
+
+    let compositor = CompositorState::bind(&globals, &qh)?;
+    let layer_shell = LayerShell::bind(&globals, &qh)?;
+    let shm = Shm::bind(&globals, &qh)?;
+    let surface = compositor.create_surface(&qh);
+    let layer = layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("nock"), None);
+    layer.set_anchor(Anchor::TOP | Anchor::LEFT | Anchor::RIGHT);
+    layer.set_exclusive_zone(32);
+    layer.set_size(0, 32);
+    layer.wl_surface().commit();
+
+    let pool = SlotPool::new(64 * 64 * 4, &shm)?;
+
     let mut app = App::new();
     let id = SurfaceId::new(1);
     app.add_surface(id, FrameMode::Idle { animation_cap: 60 });
 
-    let mut event_loop = EventLoop::<App>::try_new()?;
-    let handle = event_loop.handle();
-    handle.insert_source(
-        Timer::from_duration(Duration::from_secs_f32(1.0)),
-        |deadline, _meta, app| {
-            app.mark_dirty(id);
-            for (sid, action) in app.tick(deadline) {
-                println!("{sid:?} -> {action:?}");
-            }
-            TimeoutAction::ToDuration(Duration::from_secs(1))
-        },
-    )?;
+    let mut nock = Nock {
+        app,
+        clock_id: id,
+        registry_state: RegistryState::new(&globals),
+        compositor_state: compositor,
+        exit: false,
+        layer_shell,
+        output_state: OutputState::new(&globals, &qh),
+        layer_surface: layer,
+        pool,
+        shm,
+        width: 0,
+        height: 32,
+    };
 
-    event_loop.run(None, &mut app, |_| {})?;
+    let mut event_loop = EventLoop::<Nock>::try_new()?;
+
+    WaylandSource::new(conn, event_queue).insert(event_loop.handle())?;
+
+    event_loop.run(None, &mut nock, |_| {})?;
 
     Ok(())
 }

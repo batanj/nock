@@ -18,15 +18,15 @@ use wayland_client::{Connection, QueueHandle, globals::registry_queue_init, prot
 struct LayerDemo {
     registry_state: RegistryState,
     shm: Shm,
-    compositor_state: CompositorState,
-    layer_shell: LayerShell,
+    _compositor_state: CompositorState,
+    _layer_shell: LayerShell,
 
     layer_surface: LayerSurface,
     pool: SlotPool,
 
     width: u32,
     height: u32,
-    configured: bool,
+    _configured: bool,
     exit: bool,
     output_state: OutputState,
     shift: Option<u32>,
@@ -52,7 +52,9 @@ impl LayerDemo {
         {
             let shift = self.shift.unwrap_or(0);
             canvas
-                .chunks_exact_mut(4)
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
                 .enumerate()
                 .for_each(|(index, chunk)| {
                     let x = ((index + shift as usize) % width as usize) as u32;
@@ -64,7 +66,7 @@ impl LayerDemo {
                     let b = u32::min(((width - x) * 0xFF) / width, (y * 0xFF) / height);
                     let color = (a << 24) + (r << 16) + (g << 8) + b;
 
-                    let array: &mut [u8; 4] = chunk.try_into().unwrap();
+                    let array: &mut [u8; 4] = chunk;
                     *array = color.to_le_bytes();
                 });
 
@@ -156,6 +158,13 @@ impl LayerShellHandler for LayerDemo {
         configure: LayerSurfaceConfigure,
         serial: u32,
     ) {
+        if configure.new_size.0 > 0 {
+            self.width = configure.new_size.0
+        }
+        if configure.new_size.1 > 0 {
+            self.height = configure.new_size.1
+        }
+
         self.draw(qh);
         println!("draw {}x{}", self.width, self.height);
         println!("configure serial={serial} size={:?}", configure.new_size);
@@ -226,20 +235,22 @@ fn main() {
     layer.set_size(0, 32);
     layer.wl_surface().commit();
 
-    let pool = SlotPool::new(256 * 256 * 4, &shm).expect("Failed to create pool");
+    let (width, height) = (1536, 32);
+    let pool =
+        SlotPool::new((width * height * 4 * 2) as usize, &shm).expect("Failed to create pool");
 
     println!("Layer surface created! Entering Wayland event dispatch loop...");
 
     let mut app = LayerDemo {
         registry_state: RegistryState::new(&globals),
         shm,
-        compositor_state: compositor,
-        layer_shell,
+        _compositor_state: compositor,
+        _layer_shell: layer_shell,
         layer_surface: layer,
         pool,
         width: 1536,
         height: 32,
-        configured: false,
+        _configured: false,
         exit: false,
         output_state: OutputState::new(&globals, &qh),
         shift: Some(1),
