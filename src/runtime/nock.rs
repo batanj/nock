@@ -30,10 +30,11 @@ pub struct Nock {
     pub width: u32,
     pub height: u32,
     pub exit: bool,
+    pub red: bool,
 }
 
 impl Nock {
-    fn draw(&mut self, qh: &QueueHandle<Self>) {
+    pub fn draw(&mut self) {
         let width = self.width as i32;
         let height = self.height as i32;
         let stride = width * 4;
@@ -43,8 +44,13 @@ impl Nock {
             .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
             .expect("create buffer");
 
-        for px in canvas.as_chunks_mut::<4>().0 {
-            px.copy_from_slice(&[0x00, 0x00, 0xFF, 0xFF]);
+        let (pixels, _) = canvas.as_chunks_mut::<4>();
+        for px in pixels {
+            if self.red {
+                px.copy_from_slice(&[0x00, 0x00, 0xFF, 0xFF]);
+            } else {
+                px.copy_from_slice(&[0xFF, 0x00, 0x00, 0xFF]);
+            }
         }
 
         self.layer_surface
@@ -54,6 +60,8 @@ impl Nock {
             .attach_to(self.layer_surface.wl_surface())
             .expect("attach");
         self.layer_surface.commit();
+
+        println!("shm attach {}x{}", self.width, self.height);
     }
 }
 
@@ -130,7 +138,7 @@ impl LayerShellHandler for Nock {
         for (id, action) in self.app.tick(now) {
             println!("{id:?} -> {action:?}");
             if action == crate::Action::Paint && id == self.clock_id {
-                self.draw(qh);
+                self.draw();
             }
         }
 

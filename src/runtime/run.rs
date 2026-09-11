@@ -1,9 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use calloop::{
-    EventLoop,
-    timer::{TimeoutAction, Timer},
-};
+use calloop::{EventLoop, timer::Timer};
 use calloop_wayland_source::WaylandSource;
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -18,6 +15,7 @@ use smithay_client_toolkit::{
 use wayland_client::{Connection, globals::registry_queue_init};
 
 use crate::{
+    Action::Paint,
     FrameMode, SurfaceId,
     runtime::{app::App, nock::Nock},
 };
@@ -56,9 +54,25 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         shm,
         width: 0,
         height: 32,
+        red: true,
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
+    let handle = event_loop.handle();
+    handle.insert_source(
+        Timer::from_duration(Duration::from_secs(1)),
+        |deadline, _, nock| {
+            nock.app.mark_dirty(nock.clock_id);
+            for (id, action) in nock.app.tick(deadline) {
+                if action == Paint && id == nock.clock_id {
+                    nock.red = !nock.red;
+                    nock.draw();
+                    println!("{id:?} -> {action:?} red={}", nock.red);
+                }
+            }
+            calloop::timer::TimeoutAction::ToDuration(Duration::from_secs(1))
+        },
+    )?;
 
     WaylandSource::new(conn, event_queue).insert(event_loop.handle())?;
 
@@ -69,7 +83,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::Cell, rc::Rc};
+    use std::{cell::Cell, rc::Rc, time::Duration};
+
+    use calloop::timer::{TimeoutAction, Timer};
 
     use crate::Action;
 
