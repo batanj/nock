@@ -10,7 +10,7 @@ use smithay_client_toolkit::{
         WaylandSurface,
         wlr_layer::{Anchor, Layer, LayerShell},
     },
-    shm::{Shm, slot::SlotPool},
+    shm::Shm,
 };
 use wayland_client::{Connection, globals::registry_queue_init};
 
@@ -34,8 +34,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     layer.set_exclusive_zone(32);
     layer.set_size(0, 32);
     layer.wl_surface().commit();
-
-    let pool = SlotPool::new(64 * 64 * 4, &shm)?;
 
     let mut app = App::new();
     let id = SurfaceId::new(1);

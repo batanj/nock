@@ -37,11 +37,11 @@ pub struct Nock {
 
 impl Nock {
     pub fn draw(&mut self) {
-        let Some(egl) = &self.egl else { return };
+        let Some(egl) = &mut self.egl else { return };
         if self.red {
-            egl.clear_rgb(1.0, 0.0, 0.0)
+            egl.clear_skia(1.0, 0.0, 0.0)
         } else {
-            egl.clear_rgb(0.0, 0.0, 1.0)
+            egl.clear_skia(0.0, 0.0, 1.0)
         };
         egl.swap().expect("egl swap");
         println!("egl swap {}x{}", self.width, self.height);

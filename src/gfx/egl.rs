@@ -1,6 +1,13 @@
 use std::{error::Error, os::raw::c_void};
 
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
+use skia_safe::{
+    ColorType,
+    gpu::{
+        self,
+        gl::{Format::RGBA8, Interface},
+    },
+};
 use wayland_client::backend::ObjectId;
 use wayland_egl::WlEglSurface;
 
@@ -10,6 +17,8 @@ pub struct Egl {
     pub context: egl::Context,
     pub surface: egl::Surface,
     pub window: WlEglSurface,
+    pub skia_surface: skia_safe::Surface,
+    pub gr_context: skia_safe::gpu::DirectContext,
 }
 
 impl Egl {
@@ -58,18 +67,63 @@ impl Egl {
         };
         instance.make_current(display, Some(surface), Some(surface), Some(context))?;
 
+        let interface = Interface::new_load_with(|name| {
+            instance
+                .get_proc_address(name)
+                .map(|p| p as *const std::ffi::c_void)
+                .unwrap_or(std::ptr::null())
+        })
+        .expect("interface");
+
+        let mut gr_context = skia_safe::gpu::direct_contexts::make_gl(interface, None)
+            .ok_or("DirectContext::new_gl")?;
+
+        let fb_info = gpu::gl::FramebufferInfo {
+            fboid: 0,
+            format: RGBA8.into(),
+            protected: gpu::Protected::No,
+        };
+        let backend_rt = gpu::backend_render_targets::make_gl((width, height), 0, 0, fb_info);
+        let skia_surface = gpu::surfaces::wrap_backend_render_target(
+            &mut gr_context,
+            &backend_rt,
+            gpu::SurfaceOrigin::BottomLeft,
+            ColorType::RGBA8888,
+            None,
+            None,
+        )
+        .ok_or("wrap_backend_render_target returned None")?;
+
         Ok(Self {
             instance,
             display,
             context,
             surface,
             window,
+            skia_surface,
+            gr_context,
         })
     }
 
     pub fn swap(&self) -> Result<(), khronos_egl::Error> {
         self.instance.swap_buffers(self.display, self.surface)?;
         Ok(())
+    }
+
+    pub fn clear_skia(&mut self, r: f32, g: f32, b: f32) {
+        self.instance
+            .make_current(
+                self.display,
+                Some(self.surface),
+                Some(self.surface),
+                Some(self.context),
+            )
+            .ok();
+
+        let surface = &mut self.skia_surface;
+        let canvas = surface.canvas();
+        canvas.clear(skia_safe::Color4f::new(r, g, b, 1.0));
+        self.gr_context.flush_and_submit();
     }
 
     pub fn clear_rgb(&self, r: f32, g: f32, b: f32) {
