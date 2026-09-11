@@ -2,7 +2,7 @@ use std::{error::Error, os::raw::c_void};
 
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
 use skia_safe::{
-    ColorType,
+    Color4f, ColorType, Font, FontMgr, Paint, Point,
     gpu::{
         self,
         gl::{Format::RGBA8, Interface},
@@ -122,37 +122,30 @@ impl Egl {
 
         let surface = &mut self.skia_surface;
         let canvas = surface.canvas();
+
+        let font_mgr = FontMgr::new();
+        let typeface = font_mgr
+            .match_family_style("Noto Sans", skia_safe::FontStyle::normal())
+            .ok_or_else(|| {
+                font_mgr
+                    .match_family_style("JetBrainsMono Nerd Font", skia_safe::FontStyle::normal())
+                    .expect("error loading backup font")
+            })
+            .expect("error loading preferred font");
+
+        let font_size = 24.0;
+        let font = Font::from_typeface(typeface, font_size);
+
+        let mut paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None); // white
+        paint.set_anti_alias(true);
+
+        let text = "Hello, Skia!";
+        let origin = Point::new(12.0, 22.0);
+
         canvas.clear(skia_safe::Color4f::new(r, g, b, 1.0));
+
+        canvas.draw_str(text, origin, &font, &paint);
+
         self.gr_context.flush_and_submit();
-    }
-
-    pub fn clear_rgb(&self, r: f32, g: f32, b: f32) {
-        self.instance
-            .make_current(
-                self.display,
-                Some(self.surface),
-                Some(self.surface),
-                Some(self.context),
-            )
-            .ok();
-
-        type ClearColor = unsafe extern "C" fn(f32, f32, f32, f32);
-        type Clear = unsafe extern "C" fn(u32);
-        const COLOR_BUFFER_BIT: u32 = 0x0000_4000;
-
-        unsafe {
-            let cc = self
-                .instance
-                .get_proc_address("glClearColor")
-                .map(|p| std::mem::transmute::<_, ClearColor>(p));
-            let cl = self
-                .instance
-                .get_proc_address("glClear")
-                .map(|p| std::mem::transmute::<_, Clear>(p));
-            if let (Some(cc), Some(cl)) = (cc, cl) {
-                cc(r, g, b, 1.0);
-                cl(COLOR_BUFFER_BIT);
-            }
-        }
     }
 }
