@@ -8,7 +8,9 @@ calloop = "0.14"
 calloop-wayland-source = "0.4"
 smithay-client-toolkit = "0"
 wayland-client = "0.31"
-skia-safe = { version = "0.89", features = ["gl"]}
+skia-safe = { version = "0.89", default-features = false, features = ["gl", "egl", "binary-cache"]}
+wayland-egl = "0.32"
+khronos-egl = { version = "6", features = ["dynamic"] }
 
 [[example]]
 name = "layer_shm"

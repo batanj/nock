@@ -50,11 +50,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         layer_shell,
         output_state: OutputState::new(&globals, &qh),
         layer_surface: layer,
-        pool,
         shm,
         width: 0,
         height: 32,
         red: true,
+        egl: None,
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;

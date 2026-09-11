@@ -1,3 +1,5 @@
+use std::ffi::c_void;
+
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_dispatch2, delegate_registry,
@@ -8,14 +10,14 @@ use smithay_client_toolkit::{
         WaylandSurface,
         wlr_layer::{LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     },
-    shm::{Shm, ShmHandler, slot::SlotPool},
+    shm::{Shm, ShmHandler},
 };
 use wayland_client::{
-    Connection, QueueHandle,
-    protocol::{wl_output, wl_shm, wl_surface},
+    Connection, Proxy, QueueHandle,
+    protocol::{wl_output, wl_surface},
 };
 
-use crate::{SurfaceId, runtime::app::App};
+use crate::{SurfaceId, gfx::egl::Egl, runtime::app::App};
 
 pub struct Nock {
     pub app: App,
@@ -26,102 +28,83 @@ pub struct Nock {
     pub compositor_state: CompositorState,
     pub layer_shell: LayerShell,
     pub layer_surface: LayerSurface,
-    pub pool: SlotPool,
     pub width: u32,
     pub height: u32,
     pub exit: bool,
     pub red: bool,
+    pub egl: Option<Egl>,
 }
 
 impl Nock {
     pub fn draw(&mut self) {
-        let width = self.width as i32;
-        let height = self.height as i32;
-        let stride = width * 4;
-
-        let (buffer, canvas) = self
-            .pool
-            .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
-            .expect("create buffer");
-
-        let (pixels, _) = canvas.as_chunks_mut::<4>();
-        for px in pixels {
-            if self.red {
-                px.copy_from_slice(&[0x00, 0x00, 0xFF, 0xFF]);
-            } else {
-                px.copy_from_slice(&[0xFF, 0x00, 0x00, 0xFF]);
-            }
-        }
-
-        self.layer_surface
-            .wl_surface()
-            .damage_buffer(0, 0, width, height);
-        buffer
-            .attach_to(self.layer_surface.wl_surface())
-            .expect("attach");
-        self.layer_surface.commit();
-
-        println!("shm attach {}x{}", self.width, self.height);
+        let Some(egl) = &self.egl else { return };
+        if self.red {
+            egl.clear_rgb(1.0, 0.0, 0.0)
+        } else {
+            egl.clear_rgb(0.0, 0.0, 1.0)
+        };
+        egl.swap().expect("egl swap");
+        println!("egl swap {}x{}", self.width, self.height);
     }
 }
 
 impl CompositorHandler for Nock {
     fn scale_factor_changed(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        surface: &wl_surface::WlSurface,
-        new_factor: i32,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _new_factor: i32,
     ) {
     }
 
     fn frame(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        surface: &wl_surface::WlSurface,
-        time: u32,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _time: u32,
     ) {
     }
 
     fn surface_enter(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        surface: &wl_surface::WlSurface,
-        output: &wl_output::WlOutput,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
     ) {
     }
 
     fn surface_leave(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        surface: &wl_surface::WlSurface,
-        output: &wl_output::WlOutput,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
     ) {
     }
 
     fn transform_changed(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        surface: &wl_surface::WlSurface,
-        new_transform: wayland_client::protocol::wl_output::Transform,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _new_transform: wayland_client::protocol::wl_output::Transform,
     ) {
     }
 }
 
 impl LayerShellHandler for Nock {
-    fn closed(&mut self, conn: &Connection, qh: &QueueHandle<Self>, layer: &LayerSurface) {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
         self.exit = true;
     }
 
     fn configure(
         &mut self,
         conn: &Connection,
-        qh: &QueueHandle<Self>,
-        layer: &LayerSurface,
+        _qh: &QueueHandle<Self>,
+        _layer: &LayerSurface,
         configure: LayerSurfaceConfigure,
         serial: u32,
     ) {
@@ -130,6 +113,22 @@ impl LayerShellHandler for Nock {
         }
         if configure.new_size.1 > 0 {
             self.height = configure.new_size.1
+        }
+        let display_ptr = conn.backend().display_ptr() as *mut c_void;
+
+        if self.egl.is_none() && self.width > 0 && self.height > 0 {
+            self.egl = Some(
+                Egl::bind(
+                    display_ptr,
+                    self.layer_surface.wl_surface().id(),
+                    self.width as i32,
+                    self.height as i32,
+                )
+                .expect("egl bind"),
+            );
+        } else if let Some(egl) = &self.egl {
+            egl.window
+                .resize(self.width as i32, self.height as i32, 0, 0);
         }
 
         self.app.mark_dirty(self.clock_id);
@@ -161,25 +160,25 @@ impl OutputHandler for Nock {
 
     fn new_output(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        output: wl_output::WlOutput,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
     ) {
     }
 
     fn update_output(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        output: wl_output::WlOutput,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
     ) {
     }
 
     fn output_destroyed(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        output: wl_output::WlOutput,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
     ) {
     }
 }
