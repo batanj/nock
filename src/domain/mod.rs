@@ -5,3 +5,4 @@ pub mod widget;
 
 pub use frame::{Action, Budget, FrameMode};
 pub use surface::{Surface, SurfaceId};
+pub use widget::Widget;

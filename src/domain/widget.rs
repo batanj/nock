@@ -2,17 +2,17 @@ use std::cmp::max;
 
 use crate::domain::layout::{Constraints, Rect, Size};
 
-enum Widget {
+pub enum Widget {
     Label { text: String },
     Row { children: Vec<Widget> },
 }
 
 impl Widget {
-    fn layout(widget: &Widget, constraints: &Constraints) -> (Size, Vec<Rect>) {
+    pub fn layout(widget: &Widget, constraints: &Constraints) -> (Size, Vec<(Rect, String)>) {
         match widget {
             Widget::Label { text } => {
                 let size = Size::new((text.len() as u32 * 8).min(constraints.max_width), 16);
-                let rects = vec![Rect::new(0, 0, size.width, size.height)];
+                let rects = vec![(Rect::new(0, 0, size.width, size.height), text.clone())];
                 (size, rects)
             }
             Widget::Row { children } => {
@@ -21,13 +21,16 @@ impl Widget {
                 let mut all_rects = vec![];
                 for child in children {
                     let (child_size, child_rects) = Widget::layout(child, constraints);
-                    for r in child_rects {
-                        all_rects.push(Rect {
-                            x: r.x + x,
-                            y: r.y,
-                            width: r.width,
-                            height: r.height,
-                        });
+                    for (r, s) in child_rects {
+                        all_rects.push((
+                            Rect {
+                                x: r.x + x,
+                                y: r.y,
+                                width: r.width,
+                                height: r.height,
+                            },
+                            s,
+                        ));
                     }
                     x += child_size.width;
                     max_h = max(max_h, child_size.height);
@@ -72,7 +75,10 @@ mod tests {
             }],
         };
         assert_eq!(
-            (Size::new(16, 16), vec![Rect::new(0, 0, 16, 16)]),
+            (
+                Size::new(16, 16),
+                vec![(Rect::new(0, 0, 16, 16), "ab".into())]
+            ),
             Widget::layout(
                 &widget,
                 &Constraints {
@@ -95,7 +101,10 @@ mod tests {
         assert_eq!(
             (
                 Size::new(24, 16),
-                vec![Rect::new(0, 0, 8, 16), Rect::new(8, 0, 16, 16)]
+                vec![
+                    (Rect::new(0, 0, 8, 16), "a".into()),
+                    (Rect::new(8, 0, 16, 16), "ab".into())
+                ]
             ),
             Widget::layout(
                 &widget,
@@ -116,7 +125,10 @@ mod tests {
         };
 
         assert_eq!(
-            (Size::new(16, 16), vec![Rect::new(0, 0, 16, 16)]),
+            (
+                Size::new(16, 16),
+                vec![(Rect::new(0, 0, 16, 16), "abcd".into())]
+            ),
             Widget::layout(
                 &widget,
                 &Constraints {

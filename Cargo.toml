@@ -11,6 +11,7 @@ wayland-client = "0.31"
 skia-safe = { version = "0.89", default-features = false, features = ["gl", "egl", "binary-cache"]}
 wayland-egl = "0.32"
 khronos-egl = { version = "6", features = ["dynamic"] }
+chrono = "0.4.45"
 
 [[example]]
 name = "layer_shm"

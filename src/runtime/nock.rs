@@ -10,41 +10,45 @@ use smithay_client_toolkit::{
         WaylandSurface,
         wlr_layer::{LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     },
-    shm::{Shm, ShmHandler},
 };
 use wayland_client::{
     Connection, Proxy, QueueHandle,
     protocol::{wl_output, wl_surface},
 };
 
-use crate::{SurfaceId, gfx::egl::Egl, runtime::app::App};
+use crate::{SurfaceId, Widget, domain::layout::Constraints, gfx::egl::Egl, runtime::app::App};
 
 pub struct Nock {
     pub app: App,
     pub clock_id: SurfaceId,
     pub registry_state: RegistryState,
     pub output_state: OutputState,
-    pub shm: Shm,
     pub compositor_state: CompositorState,
     pub layer_shell: LayerShell,
     pub layer_surface: LayerSurface,
     pub width: u32,
     pub height: u32,
     pub exit: bool,
-    pub red: bool,
     pub egl: Option<Egl>,
+    pub root: Widget,
 }
 
 impl Nock {
     pub fn draw(&mut self) {
         let Some(egl) = &mut self.egl else { return };
-        if self.red {
-            egl.clear_skia(1.0, 0.0, 0.0)
-        } else {
-            egl.clear_skia(0.0, 0.0, 1.0)
-        };
-        egl.swap().expect("egl swap");
-        println!("egl swap {}x{}", self.width, self.height);
+        let items = Widget::layout(
+            &self.root,
+            &Constraints {
+                max_width: self.width,
+                max_height: self.height,
+            },
+        )
+        .1;
+        egl.begin_frame(0.12, 0.12, 0.14);
+        for (rect, text) in items {
+            egl.draw_label(&text, rect);
+        }
+        egl.end_frame();
     }
 }
 
@@ -144,12 +148,6 @@ impl LayerShellHandler for Nock {
         // self.draw(qh);
         println!("draw {}x{}", self.width, self.height);
         println!("configure serial={serial} size={:?}", configure.new_size);
-    }
-}
-
-impl ShmHandler for Nock {
-    fn shm_state(&mut self) -> &mut Shm {
-        &mut self.shm
     }
 }
 

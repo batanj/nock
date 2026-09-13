@@ -2,7 +2,7 @@ use std::{error::Error, os::raw::c_void};
 
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
 use skia_safe::{
-    Color4f, ColorType, Font, FontMgr, Paint, Point,
+    Canvas, Color4f, ColorType, Font, FontMgr, Paint, Point,
     gpu::{
         self,
         gl::{Format::RGBA8, Interface},
@@ -10,6 +10,8 @@ use skia_safe::{
 };
 use wayland_client::backend::ObjectId;
 use wayland_egl::WlEglSurface;
+
+use crate::domain::layout::Rect;
 
 pub struct Egl {
     pub instance: egl::DynamicInstance<egl::EGL1_5>,
@@ -19,6 +21,7 @@ pub struct Egl {
     pub window: WlEglSurface,
     pub skia_surface: skia_safe::Surface,
     pub gr_context: skia_safe::gpu::DirectContext,
+    pub font: String,
 }
 
 impl Egl {
@@ -102,6 +105,7 @@ impl Egl {
             window,
             skia_surface,
             gr_context,
+            font: "Noto Sans".into(),
         })
     }
 
@@ -110,7 +114,30 @@ impl Egl {
         Ok(())
     }
 
-    pub fn clear_skia(&mut self, r: f32, g: f32, b: f32) {
+    pub fn draw_label(&mut self, text: &str, rect: Rect) {
+        let surface = &mut self.skia_surface;
+        let canvas = surface.canvas();
+
+        let font_mgr = FontMgr::new();
+        let typeface = font_mgr
+            .match_family_style(&self.font, skia_safe::FontStyle::normal())
+            .expect("error loading preferred font");
+
+        let mut paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None); // white
+        paint.set_anti_alias(true);
+
+        let x = rect.x as f32;
+        let y = rect.y as f32 + rect.height as f32 - 4.0;
+
+        let font_size = 16.0;
+        let font = Font::from_typeface(typeface, font_size);
+
+        let origin = Point::new(x, y);
+
+        canvas.draw_str(text, origin, &font, &paint);
+    }
+
+    pub fn begin_frame(&mut self, r: f32, g: f32, b: f32) {
         self.instance
             .make_current(
                 self.display,
@@ -119,33 +146,13 @@ impl Egl {
                 Some(self.context),
             )
             .ok();
-
         let surface = &mut self.skia_surface;
         let canvas = surface.canvas();
-
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style("Noto Sans", skia_safe::FontStyle::normal())
-            .ok_or_else(|| {
-                font_mgr
-                    .match_family_style("JetBrainsMono Nerd Font", skia_safe::FontStyle::normal())
-                    .expect("error loading backup font")
-            })
-            .expect("error loading preferred font");
-
-        let font_size = 24.0;
-        let font = Font::from_typeface(typeface, font_size);
-
-        let mut paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None); // white
-        paint.set_anti_alias(true);
-
-        let text = "Hello, Skia!";
-        let origin = Point::new(12.0, 22.0);
-
         canvas.clear(skia_safe::Color4f::new(r, g, b, 1.0));
+    }
 
-        canvas.draw_str(text, origin, &font, &paint);
-
+    pub fn end_frame(&mut self) {
         self.gr_context.flush_and_submit();
+        self.swap().expect("egl swap");
     }
 }

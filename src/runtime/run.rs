@@ -2,6 +2,7 @@ use std::{error::Error, time::Duration};
 
 use calloop::{EventLoop, timer::Timer};
 use calloop_wayland_source::WaylandSource;
+use chrono::{Local, Timelike};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
@@ -10,13 +11,12 @@ use smithay_client_toolkit::{
         WaylandSurface,
         wlr_layer::{Anchor, Layer, LayerShell},
     },
-    shm::Shm,
 };
 use wayland_client::{Connection, globals::registry_queue_init};
 
 use crate::{
     Action::Paint,
-    FrameMode, SurfaceId,
+    FrameMode, SurfaceId, Widget,
     runtime::{app::App, nock::Nock},
 };
 
@@ -27,7 +27,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     let compositor = CompositorState::bind(&globals, &qh)?;
     let layer_shell = LayerShell::bind(&globals, &qh)?;
-    let shm = Shm::bind(&globals, &qh)?;
     let surface = compositor.create_surface(&qh);
     let layer = layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("nock"), None);
     layer.set_anchor(Anchor::TOP | Anchor::LEFT | Anchor::RIGHT);
@@ -48,35 +47,54 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         layer_shell,
         output_state: OutputState::new(&globals, &qh),
         layer_surface: layer,
-        shm,
         width: 0,
         height: 32,
-        red: true,
         egl: None,
+        root: Widget::Label { text: format_now() },
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
-    let handle = event_loop.handle();
-    handle.insert_source(
-        Timer::from_duration(Duration::from_secs(1)),
-        |deadline, _, nock| {
-            nock.app.mark_dirty(nock.clock_id);
-            for (id, action) in nock.app.tick(deadline) {
-                if action == Paint && id == nock.clock_id {
-                    nock.red = !nock.red;
-                    nock.draw();
-                    println!("{id:?} -> {action:?} red={}", nock.red);
-                }
-            }
-            calloop::timer::TimeoutAction::ToDuration(Duration::from_secs(1))
-        },
-    )?;
+
+    clock(&mut event_loop);
 
     WaylandSource::new(conn, event_queue).insert(event_loop.handle())?;
 
     event_loop.run(None, &mut nock, |_| {})?;
 
     Ok(())
+}
+
+fn clock(event_loop: &mut EventLoop<Nock>) {
+    let handle = event_loop.handle();
+    handle
+        .insert_source(
+            Timer::from_duration(Duration::from_secs(1)),
+            |deadline, _, nock| {
+                nock.root = Widget::Label { text: format_now() };
+
+                nock.app.mark_dirty(nock.clock_id);
+
+                for (id, action) in nock.app.tick(deadline) {
+                    if action == Paint && id == nock.clock_id {
+                        nock.draw();
+                    }
+                }
+                calloop::timer::TimeoutAction::ToDuration(Duration::from_secs(1))
+            },
+        )
+        .expect("Failed to insert source");
+}
+
+fn format_now() -> String {
+    let now = Local::now();
+    let (is_pm, hour) = now.hour12();
+    let minute = now.minute();
+    let second = now.second();
+
+    format!(
+        "{hour:02}:{minute:02}:{second:02} {}",
+        if is_pm { "pm" } else { "am" }
+    )
 }
 
 #[cfg(test)]
