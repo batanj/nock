@@ -43,3 +43,7 @@ impl Rect {
         }
     }
 }
+
+pub trait Measure {
+    fn text_width(&self, text: &str) -> u32;
+}

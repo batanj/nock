@@ -1,6 +1,6 @@
 use std::{cmp::max, iter::zip};
 
-use crate::domain::layout::{Constraints, Rect, Size};
+use crate::domain::layout::{Constraints, Measure, Rect, Size};
 
 #[derive(Debug)]
 pub enum Widget {
@@ -11,10 +11,14 @@ pub enum Widget {
 }
 
 impl Widget {
-    pub fn layout(widget: &Widget, constraints: &Constraints) -> (Size, Vec<(Rect, String)>) {
+    pub fn layout(
+        widget: &Widget,
+        constraints: &Constraints,
+        measurer: &impl Measure,
+    ) -> (Size, Vec<(Rect, String)>) {
         match widget {
             Widget::Label { text } | Widget::Clock { text } => {
-                let size = Size::new((text.len() as u32 * 8).min(constraints.max_width), 16);
+                let size = Size::new(measurer.text_width(text).min(constraints.max_width), 16);
                 let rects = vec![(Rect::new(0, 0, size.width, size.height), text.clone())];
                 (size, rects)
             }
@@ -28,7 +32,7 @@ impl Widget {
                 let mut used = 0;
 
                 for child in children {
-                    let laid = Widget::layout(child, constraints);
+                    let laid = Widget::layout(child, constraints, measurer);
                     match child {
                         Widget::Spacer => {}
                         _ => used += laid.0.width,
@@ -88,8 +92,16 @@ impl Widget {
 mod tests {
     use super::*;
 
+    struct Fake;
+    impl Measure for Fake {
+        fn text_width(&self, text: &str) -> u32 {
+            text.len() as u32 * 8
+        }
+    }
+
     #[test]
     fn empty_row_any_constraints() {
+        let measurer = Fake;
         let children = Widget::Row { children: vec![] };
         assert_eq!(
             Size::new(0, 0),
@@ -98,7 +110,8 @@ mod tests {
                 &Constraints {
                     max_width: 0,
                     max_height: 0
-                }
+                },
+                &measurer
             )
             .0)
         );
@@ -106,6 +119,7 @@ mod tests {
 
     #[test]
     fn one_label() {
+        let measurer = Fake;
         let widget = Widget::Row {
             children: vec![Widget::Label {
                 text: String::from("ab"),
@@ -121,13 +135,15 @@ mod tests {
                 &Constraints {
                     max_width: 1000,
                     max_height: 32
-                }
+                },
+                &measurer
             )
         );
     }
 
     #[test]
     fn two_labels() {
+        let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
                 Widget::Label { text: "a".into() },
@@ -148,13 +164,15 @@ mod tests {
                 &Constraints {
                     max_width: 1000,
                     max_height: 32
-                }
+                },
+                &measurer
             )
         )
     }
 
     #[test]
     fn one_label_overflow() {
+        let measurer = Fake;
         let widget = Widget::Row {
             children: vec![Widget::Label {
                 text: "abcd".into(),
@@ -171,13 +189,15 @@ mod tests {
                 &Constraints {
                     max_width: 16,
                     max_height: 16
-                }
+                },
+                &measurer
             )
         )
     }
 
     #[test]
     fn leftover() {
+        let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
                 Widget::Label { text: "a".into() },
@@ -198,13 +218,15 @@ mod tests {
                 &Constraints {
                     max_width: 100,
                     max_height: 16
-                }
+                },
+                &measurer
             )
         );
     }
 
     #[test]
     fn clock() {
+        let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
                 Widget::Label { text: "a".into() },
@@ -225,7 +247,8 @@ mod tests {
                 &Constraints {
                     max_width: 100,
                     max_height: 16
-                }
+                },
+                &measurer
             )
         );
     }

@@ -1,17 +1,15 @@
-use std::{error::Error, os::raw::c_void};
-
+use crate::domain::layout::{Measure, Rect};
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
 use skia_safe::{
-    Canvas, Color4f, ColorType, Font, FontMgr, Paint, Point,
+    Color4f, ColorType, Font, FontMgr, Paint, Point,
     gpu::{
         self,
         gl::{Format::RGBA8, Interface},
     },
 };
+use std::{error::Error, os::raw::c_void};
 use wayland_client::backend::ObjectId;
 use wayland_egl::WlEglSurface;
-
-use crate::domain::layout::Rect;
 
 pub struct Egl {
     pub instance: egl::DynamicInstance<egl::EGL1_5>,
@@ -21,7 +19,13 @@ pub struct Egl {
     pub window: WlEglSurface,
     pub skia_surface: skia_safe::Surface,
     pub gr_context: skia_safe::gpu::DirectContext,
-    pub font: String,
+    pub font: Font,
+}
+
+impl Measure for Egl {
+    fn text_width(&self, text: &str) -> u32 {
+        self.font.measure_str(text, None).0.ceil() as u32
+    }
 }
 
 impl Egl {
@@ -97,6 +101,9 @@ impl Egl {
         )
         .ok_or("wrap_backend_render_target returned None")?;
 
+        let font_family = "Noto Sans";
+        let font = Egl::init_font(font_family);
+
         Ok(Self {
             instance,
             display,
@@ -105,7 +112,7 @@ impl Egl {
             window,
             skia_surface,
             gr_context,
-            font: "Noto Sans".into(),
+            font,
         })
     }
 
@@ -118,23 +125,24 @@ impl Egl {
         let surface = &mut self.skia_surface;
         let canvas = surface.canvas();
 
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style(&self.font, skia_safe::FontStyle::normal())
-            .expect("error loading preferred font");
-
         let mut paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None); // white
         paint.set_anti_alias(true);
 
         let x = rect.x as f32;
         let y = rect.y as f32 + rect.height as f32 - 4.0;
 
-        let font_size = 16.0;
-        let font = Font::from_typeface(typeface, font_size);
-
         let origin = Point::new(x, y);
 
-        canvas.draw_str(text, origin, &font, &paint);
+        canvas.draw_str(text, origin, self.font.as_ref(), &paint);
+    }
+
+    fn init_font(font_family: &str) -> Font {
+        let font_mgr = FontMgr::new();
+        let typeface = font_mgr
+            .match_family_style(font_family, skia_safe::FontStyle::normal())
+            .expect("error loading preferred font");
+        let font_size = 16.0;
+        Font::from_typeface(typeface, font_size)
     }
 
     pub fn begin_frame(&mut self, r: f32, g: f32, b: f32) {

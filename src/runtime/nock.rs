@@ -42,6 +42,7 @@ impl Nock {
                 max_width: self.width,
                 max_height: self.height,
             },
+            egl,
         )
         .1;
         egl.begin_frame(0.12, 0.12, 0.14);
@@ -110,7 +111,7 @@ impl LayerShellHandler for Nock {
         _qh: &QueueHandle<Self>,
         _layer: &LayerSurface,
         configure: LayerSurfaceConfigure,
-        serial: u32,
+        _serial: u32,
     ) {
         if configure.new_size.0 > 0 {
             self.width = configure.new_size.0
