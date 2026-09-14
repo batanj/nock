@@ -1,9 +1,11 @@
-use std::cmp::max;
+use std::{cmp::max, iter::zip};
 
 use crate::domain::layout::{Constraints, Rect, Size};
 
+#[derive(Debug)]
 pub enum Widget {
     Label { text: String },
+    Spacer,
     Row { children: Vec<Widget> },
 }
 
@@ -15,12 +17,34 @@ impl Widget {
                 let rects = vec![(Rect::new(0, 0, size.width, size.height), text.clone())];
                 (size, rects)
             }
+            Widget::Spacer => {
+                let size = Size::new(0, 16);
+                let rects = vec![];
+                (size, rects)
+            }
             Widget::Row { children } => {
+                let mut results = vec![];
+                let mut used = 0;
+
+                for child in children {
+                    let laid = Widget::layout(child, constraints);
+                    match child {
+                        Widget::Spacer => {}
+                        _ => used += laid.0.width,
+                    }
+                    results.push(laid);
+                }
+
+                let leftover = constraints.max_width.saturating_sub(used);
+
                 let mut x = 0;
                 let mut max_h = 0;
                 let mut all_rects = vec![];
-                for child in children {
-                    let (child_size, child_rects) = Widget::layout(child, constraints);
+                for (child, (child_size, child_rects)) in zip(children, results) {
+                    if let Widget::Spacer = child {
+                        x += leftover;
+                    }
+
                     for (r, s) in child_rects {
                         all_rects.push((
                             Rect {
@@ -137,5 +161,32 @@ mod tests {
                 }
             )
         )
+    }
+
+    #[test]
+    fn leftover() {
+        let widget = Widget::Row {
+            children: vec![
+                Widget::Label { text: "a".into() },
+                Widget::Spacer,
+                Widget::Label { text: "b".into() },
+            ],
+        };
+        assert_eq!(
+            (
+                Size::new(100, 16),
+                vec![
+                    (Rect::new(0, 0, 8, 16), "a".into()),
+                    (Rect::new(92, 0, 8, 16), "b".into())
+                ]
+            ),
+            Widget::layout(
+                &widget,
+                &Constraints {
+                    max_width: 100,
+                    max_height: 16
+                }
+            )
+        );
     }
 }

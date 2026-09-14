@@ -139,15 +139,10 @@ impl LayerShellHandler for Nock {
 
         let now = std::time::Instant::now();
         for (id, action) in self.app.tick(now) {
-            println!("{id:?} -> {action:?}");
             if action == crate::Action::Paint && id == self.clock_id {
                 self.draw();
             }
         }
-
-        // self.draw(qh);
-        println!("draw {}x{}", self.width, self.height);
-        println!("configure serial={serial} size={:?}", configure.new_size);
     }
 }
 

@@ -50,7 +50,15 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         width: 0,
         height: 32,
         egl: None,
-        root: Widget::Label { text: format_now() },
+        root: Widget::Row {
+            children: vec![
+                Widget::Label {
+                    text: "nock".into(),
+                },
+                Widget::Spacer,
+                Widget::Label { text: format_now() },
+            ],
+        },
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
@@ -70,7 +78,11 @@ fn clock(event_loop: &mut EventLoop<Nock>) {
         .insert_source(
             Timer::from_duration(Duration::from_secs(1)),
             |deadline, _, nock| {
-                nock.root = Widget::Label { text: format_now() };
+                if let Widget::Row { ref mut children } = nock.root
+                    && let Some(Widget::Label { text }) = children.get_mut(2)
+                {
+                    *text = format_now();
+                }
 
                 nock.app.mark_dirty(nock.clock_id);
 
