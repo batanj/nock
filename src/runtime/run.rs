@@ -56,7 +56,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     text: "nock".into(),
                 },
                 Widget::Spacer,
-                Widget::Label { text: format_now() },
+                Widget::Clock { text: format_now() },
             ],
         },
     };
@@ -78,12 +78,7 @@ fn clock(event_loop: &mut EventLoop<Nock>) {
         .insert_source(
             Timer::from_duration(Duration::from_secs(1)),
             |deadline, _, nock| {
-                if let Widget::Row { ref mut children } = nock.root
-                    && let Some(Widget::Label { text }) = children.get_mut(2)
-                {
-                    *text = format_now();
-                }
-
+                Widget::set_clock(&mut nock.root, &format_now());
                 nock.app.mark_dirty(nock.clock_id);
 
                 for (id, action) in nock.app.tick(deadline) {

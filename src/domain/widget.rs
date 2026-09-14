@@ -6,13 +6,14 @@ use crate::domain::layout::{Constraints, Rect, Size};
 pub enum Widget {
     Label { text: String },
     Spacer,
+    Clock { text: String },
     Row { children: Vec<Widget> },
 }
 
 impl Widget {
     pub fn layout(widget: &Widget, constraints: &Constraints) -> (Size, Vec<(Rect, String)>) {
         match widget {
-            Widget::Label { text } => {
+            Widget::Label { text } | Widget::Clock { text } => {
                 let size = Size::new((text.len() as u32 * 8).min(constraints.max_width), 16);
                 let rects = vec![(Rect::new(0, 0, size.width, size.height), text.clone())];
                 (size, rects)
@@ -67,6 +68,18 @@ impl Widget {
                     all_rects,
                 )
             }
+        }
+    }
+
+    pub fn set_clock(widget: &mut Widget, s: &str) {
+        match widget {
+            Widget::Clock { text } => *text = s.into(),
+            Widget::Row { children } => {
+                for c in children {
+                    Widget::set_clock(c, s);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -178,6 +191,33 @@ mod tests {
                 vec![
                     (Rect::new(0, 0, 8, 16), "a".into()),
                     (Rect::new(92, 0, 8, 16), "b".into())
+                ]
+            ),
+            Widget::layout(
+                &widget,
+                &Constraints {
+                    max_width: 100,
+                    max_height: 16
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn clock() {
+        let widget = Widget::Row {
+            children: vec![
+                Widget::Label { text: "a".into() },
+                Widget::Spacer,
+                Widget::Clock { text: "b".into() },
+            ],
+        };
+        assert_eq!(
+            (
+                Size::new(100, 16),
+                vec![
+                    (Rect::new(0, 0, 8, 16), "a".into()),
+                    (Rect::new(92, 0, 8, 16), "b".into()),
                 ]
             ),
             Widget::layout(
