@@ -48,7 +48,6 @@ impl Nock {
             egl,
         )
         .1;
-        self.theme = Theme::dark();
         egl.begin_frame(&self.theme);
         for (rect, text) in items {
             egl.draw_label(&text, rect, &self.theme);
@@ -117,12 +116,21 @@ impl LayerShellHandler for Nock {
         configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
+        let mut new_w = self.width;
+        let mut new_h = self.height;
+
         if configure.new_size.0 > 0 {
-            self.width = configure.new_size.0
+            new_w = configure.new_size.0;
         }
         if configure.new_size.1 > 0 {
-            self.height = configure.new_size.1
+            new_h = configure.new_size.1;
         }
+
+        let size_changed = new_w != self.width || new_h != self.height;
+
+        self.width = new_w;
+        self.height = new_h;
+
         let display_ptr = conn.backend().display_ptr() as *mut c_void;
 
         if self.egl.is_none() && self.width > 0 && self.height > 0 {
@@ -135,7 +143,11 @@ impl LayerShellHandler for Nock {
                 )
                 .expect("egl bind"),
             );
-        } else if let Some(ref mut egl) = self.egl {
+        } else if let Some(ref mut egl) = self.egl
+            && size_changed
+            && new_w > 0
+            && new_h > 0
+        {
             egl.resize(self.width as i32, self.height as i32)
                 .expect("egl resize");
         }

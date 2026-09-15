@@ -8,6 +8,7 @@ pub enum Widget {
     Spacer,
     Clock { text: String },
     Row { children: Vec<Widget> },
+    Column { children: Vec<Widget> },
 }
 
 impl Widget {
@@ -68,6 +69,34 @@ impl Widget {
                     Size {
                         width: x,
                         height: max_h,
+                    },
+                    all_rects,
+                )
+            }
+            Widget::Column { children } => {
+                let mut y = 0;
+                let mut max_w = 0;
+                let mut all_rects = vec![];
+                for child in children {
+                    let (child_size, child_rects) = Widget::layout(child, constraints, measurer);
+                    for (r, s) in child_rects {
+                        all_rects.push((
+                            Rect {
+                                x: r.x,
+                                y: r.y + y,
+                                width: r.width,
+                                height: r.height,
+                            },
+                            s,
+                        ));
+                    }
+                    y += child_size.height;
+                    max_w = max(max_w, child_size.width);
+                }
+                (
+                    Size {
+                        width: max_w,
+                        height: y,
                     },
                     all_rects,
                 )
@@ -247,6 +276,34 @@ mod tests {
                 &Constraints {
                     max_width: 100,
                     max_height: 16
+                },
+                &measurer
+            )
+        );
+    }
+
+    #[test]
+    fn column() {
+        let measurer = Fake;
+        let widget = Widget::Column {
+            children: vec![
+                Widget::Label { text: "a".into() },
+                Widget::Label { text: "ab".into() },
+            ],
+        };
+        assert_eq!(
+            (
+                Size::new(16, 32),
+                vec![
+                    (Rect::new(0, 0, 8, 16), "a".into()),
+                    (Rect::new(0, 16, 16, 16), "ab".into()),
+                ]
+            ),
+            Widget::layout(
+                &widget,
+                &Constraints {
+                    max_width: 100,
+                    max_height: 32
                 },
                 &measurer
             )
