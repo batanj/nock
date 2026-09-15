@@ -107,7 +107,7 @@ impl Widget {
     pub fn set_clock(widget: &mut Widget, s: &str) {
         match widget {
             Widget::Clock { text } => *text = s.into(),
-            Widget::Row { children } => {
+            Widget::Row { children } | Widget::Column { children } => {
                 for c in children {
                     Widget::set_clock(c, s);
                 }
