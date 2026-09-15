@@ -119,7 +119,6 @@ impl Widget {
     pub fn hit(items: &[(Rect, String)], x: u32, y: u32) -> Option<&str> {
         for (r, s) in items.iter() {
             if x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height {
-                println!("string: {:?}, rect:{:?}", s, r);
                 return Some(s.as_str());
             }
         }

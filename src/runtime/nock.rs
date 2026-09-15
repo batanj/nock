@@ -1,14 +1,14 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, time::Instant};
 
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
-    delegate_dispatch2, delegate_registry, globals,
+    delegate_dispatch2, delegate_registry,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        pointer::{self, PointerEventKind, PointerHandler},
+        pointer::{PointerEventKind, PointerHandler},
     },
     shell::{
         WaylandSurface,
@@ -21,6 +21,7 @@ use wayland_client::{
 };
 
 use crate::{
+    Action::Paint,
     SurfaceId, Widget,
     domain::layout::{Constraints, Rect},
     gfx::egl::Egl,
@@ -44,6 +45,7 @@ pub struct Nock {
     pub root: Widget,
     pub theme: Theme,
     pub hit_items: Vec<(Rect, String)>,
+    pub is_dark: bool,
 }
 
 impl Nock {
@@ -207,17 +209,16 @@ impl OutputHandler for Nock {
 impl PointerHandler for Nock {
     fn pointer_frame(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        pointer: &wayland_client::protocol::wl_pointer::WlPointer,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _pointer: &wayland_client::protocol::wl_pointer::WlPointer,
         events: &[smithay_client_toolkit::seat::pointer::PointerEvent],
     ) {
         for event in events {
-            // Match on the specific event type (e.g., button presses, movement, axis)
             if let PointerEventKind::Press {
-                time,
-                button,
-                serial,
+                time: _,
+                button: _,
+                serial: _,
             } = &event.kind
             {
                 if event.surface != *self.layer_surface.wl_surface() {
@@ -225,7 +226,22 @@ impl PointerHandler for Nock {
                 }
                 let x = event.position.0 as u32;
                 let y = event.position.1 as u32;
-                println!("{:?}", Widget::hit(&self.hit_items, x, y));
+
+                if let Some("nock") = Widget::hit(&self.hit_items, x, y) {
+                    if self.is_dark {
+                        self.theme = Theme::light();
+                        self.is_dark = false;
+                    } else {
+                        self.theme = Theme::dark();
+                        self.is_dark = true;
+                    }
+                    self.app.mark_dirty(self.clock_id);
+                    for (id, action) in self.app.tick(Instant::now()) {
+                        if action == Paint && id == self.clock_id {
+                            self.draw();
+                        }
+                    }
+                }
             }
         }
     }
@@ -236,14 +252,14 @@ impl SeatHandler for Nock {
     }
     fn new_seat(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wayland_client::protocol::wl_seat::WlSeat,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _seat: wayland_client::protocol::wl_seat::WlSeat,
     ) {
     }
     fn new_capability(
         &mut self,
-        conn: &Connection,
+        _conn: &Connection,
         qh: &QueueHandle<Self>,
         seat: wayland_client::protocol::wl_seat::WlSeat,
         capability: smithay_client_toolkit::seat::Capability,
@@ -254,17 +270,17 @@ impl SeatHandler for Nock {
     }
     fn remove_capability(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wayland_client::protocol::wl_seat::WlSeat,
-        capability: smithay_client_toolkit::seat::Capability,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _seat: wayland_client::protocol::wl_seat::WlSeat,
+        _capability: smithay_client_toolkit::seat::Capability,
     ) {
     }
     fn remove_seat(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wayland_client::protocol::wl_seat::WlSeat,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _seat: wayland_client::protocol::wl_seat::WlSeat,
     ) {
     }
 }

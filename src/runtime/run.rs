@@ -64,6 +64,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             ],
         },
         hit_items: vec![],
+        is_dark: true,
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
