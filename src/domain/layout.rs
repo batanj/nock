@@ -10,7 +10,7 @@ pub struct Size {
     pub height: u32,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,

@@ -7,6 +7,7 @@ use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
     registry::RegistryState,
+    seat::SeatState,
     shell::{
         WaylandSurface,
         wlr_layer::{Anchor, Layer, LayerShell},
@@ -47,6 +48,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         exit: false,
         layer_shell,
         output_state: OutputState::new(&globals, &qh),
+        seat_state: SeatState::new(&globals, &qh),
         layer_surface: layer,
         width: 0,
         height: 32,
@@ -61,6 +63,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 Widget::Clock { text: format_now() },
             ],
         },
+        hit_items: vec![],
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;

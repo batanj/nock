@@ -2,10 +2,14 @@ use std::ffi::c_void;
 
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
-    delegate_dispatch2, delegate_registry,
+    delegate_dispatch2, delegate_registry, globals,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
+    seat::{
+        Capability, SeatHandler, SeatState,
+        pointer::{self, PointerEventKind, PointerHandler},
+    },
     shell::{
         WaylandSurface,
         wlr_layer::{LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
@@ -17,7 +21,11 @@ use wayland_client::{
 };
 
 use crate::{
-    SurfaceId, Widget, domain::layout::Constraints, gfx::egl::Egl, runtime::app::App, theme::Theme,
+    SurfaceId, Widget,
+    domain::layout::{Constraints, Rect},
+    gfx::egl::Egl,
+    runtime::app::App,
+    theme::Theme,
 };
 
 pub struct Nock {
@@ -25,6 +33,7 @@ pub struct Nock {
     pub clock_id: SurfaceId,
     pub registry_state: RegistryState,
     pub output_state: OutputState,
+    pub seat_state: SeatState,
     pub compositor_state: CompositorState,
     pub layer_shell: LayerShell,
     pub layer_surface: LayerSurface,
@@ -34,6 +43,7 @@ pub struct Nock {
     pub egl: Option<Egl>,
     pub root: Widget,
     pub theme: Theme,
+    pub hit_items: Vec<(Rect, String)>,
 }
 
 impl Nock {
@@ -48,6 +58,7 @@ impl Nock {
             egl,
         )
         .1;
+        self.hit_items = items.clone();
         egl.begin_frame(&self.theme);
         for (rect, text) in items {
             egl.draw_label(&text, rect, &self.theme);
@@ -193,11 +204,76 @@ impl OutputHandler for Nock {
     }
 }
 
+impl PointerHandler for Nock {
+    fn pointer_frame(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        pointer: &wayland_client::protocol::wl_pointer::WlPointer,
+        events: &[smithay_client_toolkit::seat::pointer::PointerEvent],
+    ) {
+        for event in events {
+            // Match on the specific event type (e.g., button presses, movement, axis)
+            if let PointerEventKind::Press {
+                time,
+                button,
+                serial,
+            } = &event.kind
+            {
+                if event.surface != *self.layer_surface.wl_surface() {
+                    continue;
+                }
+                let x = event.position.0 as u32;
+                let y = event.position.1 as u32;
+                println!("{:?}", Widget::hit(&self.hit_items, x, y));
+            }
+        }
+    }
+}
+impl SeatHandler for Nock {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seat_state
+    }
+    fn new_seat(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+    ) {
+    }
+    fn new_capability(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+        capability: smithay_client_toolkit::seat::Capability,
+    ) {
+        if capability == Capability::Pointer {
+            let _ = self.seat_state.get_pointer(qh, &seat);
+        }
+    }
+    fn remove_capability(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+        capability: smithay_client_toolkit::seat::Capability,
+    ) {
+    }
+    fn remove_seat(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+    ) {
+    }
+}
+
 impl ProvidesRegistryState for Nock {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.registry_state
     }
-    registry_handlers![OutputState];
+    registry_handlers![OutputState, SeatState];
 }
 
 delegate_registry!(Nock);
