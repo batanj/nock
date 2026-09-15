@@ -115,6 +115,17 @@ impl Widget {
             _ => {}
         }
     }
+
+    pub fn hit(items: &[(Rect, String)], x: u32, y: u32) -> Option<&str> {
+        for (r, s) in items.iter() {
+            if x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height {
+                println!("string: {:?}, rect:{:?}", s, r);
+                return Some(s.as_str());
+            }
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]
@@ -308,5 +319,30 @@ mod tests {
                 &measurer
             )
         );
+    }
+
+    #[test]
+    fn hit() {
+        let measurer = Fake;
+        let widget = Widget::Row {
+            children: vec![
+                Widget::Label { text: "a".into() },
+                Widget::Spacer,
+                Widget::Label { text: "b".into() },
+            ],
+        };
+        let (_, items) = Widget::layout(
+            &widget,
+            &Constraints {
+                max_width: 100,
+                max_height: 32,
+            },
+            &measurer,
+        );
+
+        assert_eq!(Widget::hit(&items, 0, 0), Some("a"));
+        assert_eq!(Widget::hit(&items, 92, 0), Some("b"));
+        assert_eq!(Widget::hit(&items, 50, 0), None);
+        assert_eq!(Widget::hit(&items, 0, 20), None);
     }
 }
