@@ -18,6 +18,7 @@ use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
     runtime::{app::App, nock::Nock},
+    theme::Theme,
 };
 
 pub fn run() -> Result<(), Box<dyn Error>> {
@@ -50,6 +51,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         width: 0,
         height: 32,
         egl: None,
+        theme: Theme::dark(),
         root: Widget::Row {
             children: vec![
                 Widget::Label {

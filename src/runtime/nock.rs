@@ -16,7 +16,9 @@ use wayland_client::{
     protocol::{wl_output, wl_surface},
 };
 
-use crate::{SurfaceId, Widget, domain::layout::Constraints, gfx::egl::Egl, runtime::app::App};
+use crate::{
+    SurfaceId, Widget, domain::layout::Constraints, gfx::egl::Egl, runtime::app::App, theme::Theme,
+};
 
 pub struct Nock {
     pub app: App,
@@ -31,6 +33,7 @@ pub struct Nock {
     pub exit: bool,
     pub egl: Option<Egl>,
     pub root: Widget,
+    pub theme: Theme,
 }
 
 impl Nock {
@@ -45,9 +48,10 @@ impl Nock {
             egl,
         )
         .1;
-        egl.begin_frame(0.12, 0.12, 0.14);
+        self.theme = Theme::dark();
+        egl.begin_frame(&self.theme);
         for (rect, text) in items {
-            egl.draw_label(&text, rect);
+            egl.draw_label(&text, rect, &self.theme);
         }
         egl.end_frame();
     }

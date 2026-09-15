@@ -1,4 +1,7 @@
-use crate::domain::layout::{Measure, Rect};
+use crate::{
+    domain::layout::{Measure, Rect},
+    theme::Theme,
+};
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
 use skia_safe::{
     Color4f, ColorType, Font, FontMgr, Paint, Point,
@@ -121,11 +124,11 @@ impl Egl {
         Ok(())
     }
 
-    pub fn draw_label(&mut self, text: &str, rect: Rect) {
+    pub fn draw_label(&mut self, text: &str, rect: Rect, theme: &Theme) {
         let surface = &mut self.skia_surface;
         let canvas = surface.canvas();
 
-        let mut paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None); // white
+        let mut paint = Paint::new(Color4f::new(theme.fg.0, theme.fg.1, theme.fg.2, 1.0), None); // white
         paint.set_anti_alias(true);
 
         let x = rect.x as f32;
@@ -145,7 +148,7 @@ impl Egl {
         Font::from_typeface(typeface, font_size)
     }
 
-    pub fn begin_frame(&mut self, r: f32, g: f32, b: f32) {
+    pub fn begin_frame(&mut self, color: &Theme) {
         self.instance
             .make_current(
                 self.display,
@@ -156,7 +159,9 @@ impl Egl {
             .ok();
         let surface = &mut self.skia_surface;
         let canvas = surface.canvas();
-        canvas.clear(skia_safe::Color4f::new(r, g, b, 1.0));
+        canvas.clear(skia_safe::Color4f::new(
+            color.bg.0, color.bg.1, color.bg.2, 1.0,
+        ));
     }
 
     pub fn end_frame(&mut self) {
