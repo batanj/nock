@@ -4,7 +4,7 @@ use crate::{
 };
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
 use skia_safe::{
-    Color4f, ColorType, Font, FontMgr, Paint, Point,
+    Color4f, ColorType, Font, FontMgr, Paint, Point, Surface,
     gpu::{
         self,
         gl::{Format::RGBA8, Interface},
@@ -84,25 +84,11 @@ impl Egl {
                 .unwrap_or(std::ptr::null())
         })
         .expect("interface");
-
         let mut gr_context = skia_safe::gpu::direct_contexts::make_gl(interface, None)
             .ok_or("DirectContext::new_gl")?;
 
-        let fb_info = gpu::gl::FramebufferInfo {
-            fboid: 0,
-            format: RGBA8.into(),
-            protected: gpu::Protected::No,
-        };
-        let backend_rt = gpu::backend_render_targets::make_gl((width, height), 0, 0, fb_info);
-        let skia_surface = gpu::surfaces::wrap_backend_render_target(
-            &mut gr_context,
-            &backend_rt,
-            gpu::SurfaceOrigin::BottomLeft,
-            ColorType::RGBA8888,
-            None,
-            None,
-        )
-        .ok_or("wrap_backend_render_target returned None")?;
+        // wrap_skia
+        let skia_surface = Egl::wrap_skia(&mut gr_context, width, height)?;
 
         let font_family = "Noto Sans";
         let font = Egl::init_font(font_family);
@@ -117,6 +103,31 @@ impl Egl {
             gr_context,
             font,
         })
+    }
+
+    fn wrap_skia(
+        gr_context: &mut skia_safe::gpu::DirectContext,
+        width: i32,
+        height: i32,
+    ) -> Result<Surface, Box<dyn Error>> {
+        let fb_info = gpu::gl::FramebufferInfo {
+            fboid: 0,
+            format: RGBA8.into(),
+            protected: gpu::Protected::No,
+        };
+        let backend_rt = gpu::backend_render_targets::make_gl((width, height), 0, 0, fb_info);
+
+        let surface = gpu::surfaces::wrap_backend_render_target(
+            gr_context,
+            &backend_rt,
+            gpu::SurfaceOrigin::BottomLeft,
+            ColorType::RGBA8888,
+            None,
+            None,
+        )
+        .ok_or_else(|| String::from("wrap_backend_render_target returned None"))?;
+
+        Ok(surface)
     }
 
     pub fn swap(&self) -> Result<(), khronos_egl::Error> {
@@ -146,6 +157,21 @@ impl Egl {
             .expect("error loading preferred font");
         let font_size = 16.0;
         Font::from_typeface(typeface, font_size)
+    }
+
+    pub fn resize(&mut self, width: i32, height: i32) -> Result<(), Box<dyn Error>> {
+        self.window.resize(width, height, 0, 0);
+        self.instance
+            .make_current(
+                self.display,
+                Some(self.surface),
+                Some(self.surface),
+                Some(self.context),
+            )
+            .ok();
+        self.skia_surface = Egl::wrap_skia(&mut self.gr_context, width, height)?;
+
+        Ok(())
     }
 
     pub fn begin_frame(&mut self, color: &Theme) {

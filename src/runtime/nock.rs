@@ -135,9 +135,9 @@ impl LayerShellHandler for Nock {
                 )
                 .expect("egl bind"),
             );
-        } else if let Some(egl) = &self.egl {
-            egl.window
-                .resize(self.width as i32, self.height as i32, 0, 0);
+        } else if let Some(ref mut egl) = self.egl {
+            egl.resize(self.width as i32, self.height as i32)
+                .expect("egl resize");
         }
 
         self.app.mark_dirty(self.clock_id);
