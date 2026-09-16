@@ -2,7 +2,7 @@ use std::{cmp::max, iter::zip};
 
 use crate::domain::layout::{Constraints, Measure, Rect, Size};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Widget {
     Label { text: String },
     Spacer,

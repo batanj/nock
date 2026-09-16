@@ -18,6 +18,7 @@ use wayland_client::{Connection, globals::registry_queue_init};
 use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
+    config::lua_cfg::{default_row, widget_from_lua},
     runtime::{app::App, nock::Nock},
     theme::Theme,
 };
@@ -54,15 +55,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         height: 32,
         egl: None,
         theme: Theme::dark(),
-        root: Widget::Row {
-            children: vec![
-                Widget::Label {
-                    text: "nock".into(),
-                },
-                Widget::Spacer,
-                Widget::Clock { text: format_now() },
-            ],
-        },
+        root: widget_from_lua(&std::fs::read_to_string("nock.lua").unwrap_or_default())
+            .unwrap_or_else(|_| default_row()),
         hit_items: vec![],
         is_dark: true,
     };
