@@ -44,7 +44,7 @@ pub struct Nock {
     pub egl: Option<Egl>,
     pub root: Widget,
     pub theme: Theme,
-    pub hit_items: Vec<(Rect, String)>,
+    pub hit_items: Vec<(Rect, String, Option<String>)>,
     pub is_dark: bool,
 }
 
@@ -62,7 +62,7 @@ impl Nock {
         .1;
         self.hit_items = items.clone();
         egl.begin_frame(&self.theme);
-        for (rect, text) in items {
+        for (rect, text, _id) in items {
             egl.draw_label(&text, rect, &self.theme);
         }
         egl.end_frame();
@@ -227,7 +227,7 @@ impl PointerHandler for Nock {
                 let x = event.position.0 as u32;
                 let y = event.position.1 as u32;
 
-                if let Some("nock") = Widget::hit(&self.hit_items, x, y) {
+                if let Some("brand") = Widget::hit(&self.hit_items, x, y) {
                     if self.is_dark {
                         self.theme = Theme::light();
                         self.is_dark = false;

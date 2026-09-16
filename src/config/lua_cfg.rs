@@ -57,9 +57,11 @@ fn widget_from_table(table: &Table) -> Result<Widget, Box<dyn std::error::Error>
         "spacer" => Widget::Spacer,
         "label" => Widget::Label {
             text: table.get("text")?,
+            id: table.get("id")?,
         },
         "clock" => Widget::Clock {
             text: table.get("text").unwrap_or_else(|_| String::new()),
+            id: table.get("id")?,
         },
         "row" | "column" => {
             let children: Table = table.get("children")?;
@@ -84,9 +86,13 @@ pub fn default_row() -> Widget {
         children: vec![
             Widget::Label {
                 text: "nock".into(),
+                id: Some("brand".into()),
             },
             Widget::Spacer,
-            Widget::Clock { text: "".into() },
+            Widget::Clock {
+                text: "".into(),
+                id: None,
+            },
         ],
     }
 }
@@ -100,7 +106,8 @@ mod tests {
         assert_eq!(
             widget_from_lua(r#"return { kind = "label", text = "nock" }"#).unwrap(),
             Widget::Label {
-                text: "nock".to_string()
+                text: "nock".to_string(),
+                id: None,
             }
         );
     }

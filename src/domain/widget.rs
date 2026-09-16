@@ -4,9 +4,9 @@ use crate::domain::layout::{Constraints, Measure, Rect, Size};
 
 #[derive(Debug, PartialEq)]
 pub enum Widget {
-    Label { text: String },
+    Label { text: String, id: Option<String> },
     Spacer,
-    Clock { text: String },
+    Clock { text: String, id: Option<String> },
     Row { children: Vec<Widget> },
     Column { children: Vec<Widget> },
 }
@@ -16,11 +16,15 @@ impl Widget {
         widget: &Widget,
         constraints: &Constraints,
         measurer: &impl Measure,
-    ) -> (Size, Vec<(Rect, String)>) {
+    ) -> (Size, Vec<(Rect, String, Option<String>)>) {
         match widget {
-            Widget::Label { text } | Widget::Clock { text } => {
+            Widget::Label { text, id } | Widget::Clock { text, id } => {
                 let size = Size::new(measurer.text_width(text).min(constraints.max_width), 16);
-                let rects = vec![(Rect::new(0, 0, size.width, size.height), text.clone())];
+                let rects = vec![(
+                    Rect::new(0, 0, size.width, size.height),
+                    text.clone(),
+                    id.clone(),
+                )];
                 (size, rects)
             }
             Widget::Spacer => {
@@ -51,7 +55,7 @@ impl Widget {
                         x += leftover;
                     }
 
-                    for (r, s) in child_rects {
+                    for (r, s, id) in child_rects {
                         all_rects.push((
                             Rect {
                                 x: r.x + x,
@@ -60,6 +64,7 @@ impl Widget {
                                 height: r.height,
                             },
                             s,
+                            id,
                         ));
                     }
                     x += child_size.width;
@@ -79,7 +84,7 @@ impl Widget {
                 let mut all_rects = vec![];
                 for child in children {
                     let (child_size, child_rects) = Widget::layout(child, constraints, measurer);
-                    for (r, s) in child_rects {
+                    for (r, s, id) in child_rects {
                         all_rects.push((
                             Rect {
                                 x: r.x,
@@ -88,6 +93,7 @@ impl Widget {
                                 height: r.height,
                             },
                             s,
+                            id,
                         ));
                     }
                     y += child_size.height;
@@ -106,7 +112,7 @@ impl Widget {
 
     pub fn set_clock(widget: &mut Widget, s: &str) {
         match widget {
-            Widget::Clock { text } => *text = s.into(),
+            Widget::Clock { text, id: _ } => *text = s.into(),
             Widget::Row { children } | Widget::Column { children } => {
                 for c in children {
                     Widget::set_clock(c, s);
@@ -116,10 +122,10 @@ impl Widget {
         }
     }
 
-    pub fn hit(items: &[(Rect, String)], x: u32, y: u32) -> Option<&str> {
-        for (r, s) in items.iter() {
+    pub fn hit(items: &[(Rect, String, Option<String>)], x: u32, y: u32) -> Option<&str> {
+        for (r, s, id) in items.iter() {
             if x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height {
-                return Some(s.as_str());
+                return id.as_deref().or(Some(s.as_str()));
             }
         }
 
@@ -162,12 +168,13 @@ mod tests {
         let widget = Widget::Row {
             children: vec![Widget::Label {
                 text: String::from("ab"),
+                id: None,
             }],
         };
         assert_eq!(
             (
                 Size::new(16, 16),
-                vec![(Rect::new(0, 0, 16, 16), "ab".into())]
+                vec![(Rect::new(0, 0, 16, 16), "ab".into(), None)]
             ),
             Widget::layout(
                 &widget,
@@ -185,17 +192,23 @@ mod tests {
         let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
-                Widget::Label { text: "a".into() },
+                Widget::Label {
+                    text: "a".into(),
+                    id: None,
+                },
                 Widget::Row { children: vec![] },
-                Widget::Label { text: "ab".into() },
+                Widget::Label {
+                    text: "ab".into(),
+                    id: None,
+                },
             ],
         };
         assert_eq!(
             (
                 Size::new(24, 16),
                 vec![
-                    (Rect::new(0, 0, 8, 16), "a".into()),
-                    (Rect::new(8, 0, 16, 16), "ab".into())
+                    (Rect::new(0, 0, 8, 16), "a".into(), None),
+                    (Rect::new(8, 0, 16, 16), "ab".into(), None)
                 ]
             ),
             Widget::layout(
@@ -215,13 +228,14 @@ mod tests {
         let widget = Widget::Row {
             children: vec![Widget::Label {
                 text: "abcd".into(),
+                id: None,
             }],
         };
 
         assert_eq!(
             (
                 Size::new(16, 16),
-                vec![(Rect::new(0, 0, 16, 16), "abcd".into())]
+                vec![(Rect::new(0, 0, 16, 16), "abcd".into(), None)]
             ),
             Widget::layout(
                 &widget,
@@ -239,17 +253,23 @@ mod tests {
         let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
-                Widget::Label { text: "a".into() },
+                Widget::Label {
+                    text: "a".into(),
+                    id: None,
+                },
                 Widget::Spacer,
-                Widget::Label { text: "b".into() },
+                Widget::Label {
+                    text: "b".into(),
+                    id: None,
+                },
             ],
         };
         assert_eq!(
             (
                 Size::new(100, 16),
                 vec![
-                    (Rect::new(0, 0, 8, 16), "a".into()),
-                    (Rect::new(92, 0, 8, 16), "b".into())
+                    (Rect::new(0, 0, 8, 16), "a".into(), None),
+                    (Rect::new(92, 0, 8, 16), "b".into(), None)
                 ]
             ),
             Widget::layout(
@@ -268,17 +288,23 @@ mod tests {
         let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
-                Widget::Label { text: "a".into() },
+                Widget::Label {
+                    text: "a".into(),
+                    id: None,
+                },
                 Widget::Spacer,
-                Widget::Clock { text: "b".into() },
+                Widget::Clock {
+                    text: "b".into(),
+                    id: None,
+                },
             ],
         };
         assert_eq!(
             (
                 Size::new(100, 16),
                 vec![
-                    (Rect::new(0, 0, 8, 16), "a".into()),
-                    (Rect::new(92, 0, 8, 16), "b".into()),
+                    (Rect::new(0, 0, 8, 16), "a".into(), None),
+                    (Rect::new(92, 0, 8, 16), "b".into(), None),
                 ]
             ),
             Widget::layout(
@@ -297,16 +323,22 @@ mod tests {
         let measurer = Fake;
         let widget = Widget::Column {
             children: vec![
-                Widget::Label { text: "a".into() },
-                Widget::Label { text: "ab".into() },
+                Widget::Label {
+                    text: "a".into(),
+                    id: None,
+                },
+                Widget::Label {
+                    text: "ab".into(),
+                    id: None,
+                },
             ],
         };
         assert_eq!(
             (
                 Size::new(16, 32),
                 vec![
-                    (Rect::new(0, 0, 8, 16), "a".into()),
-                    (Rect::new(0, 16, 16, 16), "ab".into()),
+                    (Rect::new(0, 0, 8, 16), "a".into(), None),
+                    (Rect::new(0, 16, 16, 16), "ab".into(), None),
                 ]
             ),
             Widget::layout(
@@ -325,9 +357,15 @@ mod tests {
         let measurer = Fake;
         let widget = Widget::Row {
             children: vec![
-                Widget::Label { text: "a".into() },
+                Widget::Label {
+                    text: "a".into(),
+                    id: None,
+                },
                 Widget::Spacer,
-                Widget::Label { text: "b".into() },
+                Widget::Label {
+                    text: "b".into(),
+                    id: None,
+                },
             ],
         };
         let (_, items) = Widget::layout(
