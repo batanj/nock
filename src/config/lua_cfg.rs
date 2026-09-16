@@ -1,8 +1,49 @@
-use mlua::{Lua, Result as LuaResult, Table, Value};
+use std::{env, path::PathBuf};
+
+use mlua::{Lua, Table};
 
 use crate::Widget;
 
-pub fn widget_from_lua(content: &str) -> Result<Widget, Box<dyn std::error::Error>> {
+fn config_path() -> Option<PathBuf> {
+    config_candidates().into_iter().find(|p| p.is_file())
+}
+
+fn config_candidates() -> Vec<PathBuf> {
+    let mut v = vec![];
+    if let Ok(xdg) = env::var("XDG_CONFIG_HOME")
+        && !xdg.is_empty()
+    {
+        v.push(PathBuf::from(xdg).join("nock").join("nock.lua"));
+    }
+    if let Ok(home) = env::var("HOME") {
+        v.push(
+            PathBuf::from(home)
+                .join(".config")
+                .join("nock")
+                .join("nock.lua"),
+        );
+    }
+    v.push(PathBuf::from("nock.lua"));
+    v
+}
+
+pub fn load_root() -> Widget {
+    let Some(path) = config_path() else {
+        return default_row();
+    };
+    match std::fs::read_to_string(&path) {
+        Ok(s) => widget_from_lua(&s).unwrap_or_else(|e| {
+            eprintln!("nock: {path:?}: {e}");
+            default_row()
+        }),
+        Err(e) => {
+            eprintln!("nock: {path:?}: {e}");
+            default_row()
+        }
+    }
+}
+
+fn widget_from_lua(content: &str) -> Result<Widget, Box<dyn std::error::Error>> {
     let lua = Lua::new();
     let table: Table = lua.load(content).eval()?;
 
