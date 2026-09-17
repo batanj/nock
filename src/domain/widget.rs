@@ -102,24 +102,35 @@ impl Widget {
             Widget::Row { children } => {
                 let mut results = vec![];
                 let mut used = 0;
+                let mut num_spacers = 0;
 
                 for child in children {
                     let laid = Widget::layout(child, constraints, measurer);
                     match child {
-                        Widget::Spacer => {}
+                        Widget::Spacer => num_spacers += 1,
                         _ => used += laid.0.width,
                     }
                     results.push(laid);
                 }
 
                 let leftover = constraints.max_width.saturating_sub(used);
+                let (gap, extra) = if num_spacers == 0 {
+                    (0, 0)
+                } else {
+                    (leftover.saturating_div(num_spacers), leftover % num_spacers)
+                };
+                let mut spacers_seen = 0;
 
                 let mut x = 0;
                 let mut max_h = 0;
                 let mut all_rects = vec![];
                 for (child, (child_size, child_rects)) in zip(children, results) {
                     if let Widget::Spacer = child {
-                        x += leftover;
+                        spacers_seen += 1;
+                        x += gap;
+                        if spacers_seen == num_spacers {
+                            x += extra;
+                        }
                     }
 
                     for ht in child_rects {
@@ -536,7 +547,7 @@ mod tests {
         assert_eq!(
             Widget::hit(&items, 92, 0),
             Some(&HitTarget::new(
-                Rect::new(92, 0, 8, 16),
+                Rect::new(76, 0, 24, 16),
                 "b".to_string(),
                 None,
                 None,
@@ -546,5 +557,94 @@ mod tests {
         );
         assert_eq!(Widget::hit(&items, 50, 0), None);
         assert_eq!(Widget::hit(&items, 0, 20), None);
+    }
+
+    #[test]
+    fn spacers() {
+        let measurer = Fake;
+        let widget = Widget::Row {
+            children: vec![
+                Widget::Label {
+                    text: "a".into(),
+                    id: Some("brand".into()),
+                    on_click: Some("toggle_theme".into()),
+                    command: None,
+                    pad: 8,
+                },
+                Widget::Spacer,
+                Widget::Label {
+                    text: "b".into(),
+                    id: None,
+                    on_click: None,
+                    command: None,
+                    pad: 8,
+                },
+                Widget::Spacer,
+                Widget::Label {
+                    text: "c".into(),
+                    id: None,
+                    on_click: None,
+                    command: None,
+                    pad: 8,
+                },
+            ],
+        };
+
+        let layout = Widget::layout(
+            &widget,
+            &Constraints {
+                max_width: 103,
+                max_height: 32,
+            },
+            &measurer,
+        );
+
+        assert_eq!(
+            (
+                Size::new(103, 16),
+                vec![
+                    HitTarget::new(
+                        Rect {
+                            x: 0,
+                            y: 0,
+                            width: 24,
+                            height: 16
+                        },
+                        "a".to_string(),
+                        Some("brand".into()),
+                        Some("toggle_theme".into()),
+                        None,
+                        8
+                    ),
+                    HitTarget::new(
+                        Rect {
+                            x: 39,
+                            y: 0,
+                            width: 24,
+                            height: 16
+                        },
+                        "b".to_string(),
+                        None,
+                        None,
+                        None,
+                        8,
+                    ),
+                    HitTarget::new(
+                        Rect {
+                            x: 79,
+                            y: 0,
+                            width: 24,
+                            height: 16
+                        },
+                        "c".to_string(),
+                        None,
+                        None,
+                        None,
+                        8,
+                    )
+                ]
+            ),
+            layout
+        );
     }
 }
