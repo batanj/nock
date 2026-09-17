@@ -66,6 +66,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         config_mtime,
         hit_items: vec![],
         is_dark: true,
+        hover_id: None,
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;

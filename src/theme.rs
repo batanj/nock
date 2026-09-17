@@ -16,6 +16,12 @@ impl Theme {
             fg: (0.0, 0.0, 0.0),
         }
     }
+    pub fn hover() -> Theme {
+        Theme {
+            bg: (1.0, 1.0, 1.0),
+            fg: (1.0, 1.0, 0.0),
+        }
+    }
 }
 
 impl Default for Theme {

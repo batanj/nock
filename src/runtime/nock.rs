@@ -52,6 +52,7 @@ pub struct Nock {
     pub theme: Theme,
     pub hit_items: Vec<HitTarget>,
     pub is_dark: bool,
+    pub hover_id: Option<String>,
 }
 
 impl Nock {
@@ -69,7 +70,11 @@ impl Nock {
         self.hit_items = items.clone();
         egl.begin_frame(&self.theme);
         for ht in items {
-            egl.draw_label(&ht, &self.theme);
+            if ht.id.is_some() && ht.id == self.hover_id {
+                egl.draw_label(&ht, &Theme::hover());
+            } else {
+                egl.draw_label(&ht, &self.theme);
+            }
         }
         egl.end_frame();
     }
@@ -221,55 +226,74 @@ impl PointerHandler for Nock {
         events: &[smithay_client_toolkit::seat::pointer::PointerEvent],
     ) {
         for event in events {
-            if let PointerEventKind::Press {
-                time: _,
-                button: _,
-                serial: _,
-            } = &event.kind
-            {
-                if event.surface != *self.layer_surface.wl_surface() {
-                    continue;
-                }
-                let x = event.position.0 as u32;
-                let y = event.position.1 as u32;
+            let x = event.position.0 as u32;
+            let y = event.position.1 as u32;
 
-                if let Some(t) = Widget::hit(&self.hit_items, x, y) {
-                    match t.on_click.as_deref() {
-                        Some("toggle_theme") => {
-                            if self.is_dark {
-                                self.theme = Theme::light();
-                                self.is_dark = false;
-                            } else {
-                                self.theme = Theme::dark();
-                                self.is_dark = true;
-                            }
-                            self.app.mark_dirty(self.clock_id);
-                            for (id, action) in self.app.tick(Instant::now()) {
-                                if action == Paint && id == self.clock_id {
-                                    self.draw();
-                                }
+            match &event.kind {
+                PointerEventKind::Motion { time: _ } => {
+                    let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
+                    if new != self.hover_id {
+                        self.hover_id = new;
+                        self.app.mark_dirty(self.clock_id);
+                        for (id, action) in self.app.tick(Instant::now()) {
+                            if action == Paint && id == self.clock_id {
+                                self.draw();
                             }
                         }
-                        Some("spawn") => {
-                            let Some(cmd) = t.command.as_deref() else {
-                                eprintln!("nock: spawn missing command");
-                                continue;
-                            };
-
-                            let mut bits = cmd.split_whitespace();
-                            let Some(prog) = bits.next() else {
-                                eprintln!("nock: spawn missing command");
-                                continue;
-                            };
-
-                            if let Err(e) = std::process::Command::new(prog).args(bits).spawn() {
-                                eprintln!("nock: spawn {cmd}: {e}");
-                            }
-                        }
-                        Some(other) => eprintln!("unknown on_click {other}"),
-                        None => {}
                     }
                 }
+                PointerEventKind::Leave { serial: _ } => {
+                    self.hover_id = None;
+                }
+                PointerEventKind::Press {
+                    time: _,
+                    button: _,
+                    serial: _,
+                } => {
+                    if event.surface != *self.layer_surface.wl_surface() {
+                        continue;
+                    }
+
+                    if let Some(t) = Widget::hit(&self.hit_items, x, y) {
+                        match t.on_click.as_deref() {
+                            Some("toggle_theme") => {
+                                if self.is_dark {
+                                    self.theme = Theme::light();
+                                    self.is_dark = false;
+                                } else {
+                                    self.theme = Theme::dark();
+                                    self.is_dark = true;
+                                }
+                                self.app.mark_dirty(self.clock_id);
+                                for (id, action) in self.app.tick(Instant::now()) {
+                                    if action == Paint && id == self.clock_id {
+                                        self.draw();
+                                    }
+                                }
+                            }
+                            Some("spawn") => {
+                                let Some(cmd) = t.command.as_deref() else {
+                                    eprintln!("nock: spawn missing command");
+                                    continue;
+                                };
+
+                                let mut bits = cmd.split_whitespace();
+                                let Some(prog) = bits.next() else {
+                                    eprintln!("nock: spawn missing command");
+                                    continue;
+                                };
+
+                                if let Err(e) = std::process::Command::new(prog).args(bits).spawn()
+                                {
+                                    eprintln!("nock: spawn {cmd}: {e}");
+                                }
+                            }
+                            Some(other) => eprintln!("unknown on_click {other}"),
+                            None => {}
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
