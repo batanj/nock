@@ -2,7 +2,6 @@ use std::{error::Error, time::Duration};
 
 use calloop::{EventLoop, timer::Timer};
 use calloop_wayland_source::WaylandSource;
-use chrono::{Local, Timelike};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
@@ -18,6 +17,7 @@ use wayland_client::{Connection, globals::registry_queue_init};
 use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
+    clock_fmt::format_now,
     config::lua_cfg::{load_root, reload_if_changed},
     runtime::{app::App, nock::Nock},
     theme::Theme,
@@ -67,6 +67,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         hit_items: vec![],
         is_dark: true,
         hover_id: None,
+        hour12: true,
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
@@ -80,14 +81,17 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn clock(event_loop: &mut EventLoop<Nock>) {
+pub fn clock(event_loop: &mut EventLoop<Nock>) {
     let handle = event_loop.handle();
     handle
         .insert_source(
             Timer::from_duration(Duration::from_secs(1)),
             |deadline, _, nock| {
                 reload_if_changed(nock);
-                Widget::set_clock(&mut nock.root, &format_now());
+                Widget::set_clock(&mut nock.root, &format_now(nock.hour12));
+
+                reload_if_changed(nock);
+
                 nock.app.mark_dirty(nock.clock_id);
 
                 for (id, action) in nock.app.tick(deadline) {
@@ -99,18 +103,6 @@ fn clock(event_loop: &mut EventLoop<Nock>) {
             },
         )
         .expect("Failed to insert source");
-}
-
-fn format_now() -> String {
-    let now = Local::now();
-    let (is_pm, hour) = now.hour12();
-    let minute = now.minute();
-    let second = now.second();
-
-    format!(
-        "{hour:02}:{minute:02}:{second:02} {}",
-        if is_pm { "pm" } else { "am" }
-    )
 }
 
 #[cfg(test)]

@@ -27,6 +27,7 @@ use wayland_client::{
 use crate::{
     Action::Paint,
     SurfaceId, Widget,
+    clock_fmt::format_now,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
     runtime::app::App,
@@ -53,6 +54,7 @@ pub struct Nock {
     pub hit_items: Vec<HitTarget>,
     pub is_dark: bool,
     pub hover_id: Option<String>,
+    pub hour12: bool,
 }
 
 impl Nock {
@@ -286,6 +288,16 @@ impl PointerHandler for Nock {
                                 if let Err(e) = std::process::Command::new(prog).args(bits).spawn()
                                 {
                                     eprintln!("nock: spawn {cmd}: {e}");
+                                }
+                            }
+                            Some("toggle_clock") => {
+                                self.hour12 = !self.hour12;
+                                Widget::set_clock(&mut self.root, &format_now(self.hour12));
+                                self.app.mark_dirty(self.clock_id);
+                                for (id, action) in self.app.tick(Instant::now()) {
+                                    if action == Paint && id == self.clock_id {
+                                        self.draw();
+                                    }
                                 }
                             }
                             Some(other) => eprintln!("unknown on_click {other}"),
