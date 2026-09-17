@@ -1,8 +1,8 @@
-use std::{env, path::PathBuf};
+use std::{env, fs, path::PathBuf, time::SystemTime};
 
 use mlua::{Lua, Table};
 
-use crate::Widget;
+use crate::{Widget, runtime::nock::Nock};
 
 fn config_path() -> Option<PathBuf> {
     config_candidates().into_iter().find(|p| p.is_file())
@@ -27,20 +27,48 @@ fn config_candidates() -> Vec<PathBuf> {
     v
 }
 
-pub fn load_root() -> Widget {
-    let Some(path) = config_path() else {
-        return default_row();
-    };
-    match std::fs::read_to_string(&path) {
-        Ok(s) => widget_from_lua(&s).unwrap_or_else(|e| {
-            eprintln!("nock: {path:?}: {e}");
-            default_row()
-        }),
-        Err(e) => {
-            eprintln!("nock: {path:?}: {e}");
-            default_row()
-        }
+pub fn load_root() -> (Widget, Option<(PathBuf, SystemTime)>) {
+    if let Some(path) = config_path() {
+        let meta = fs::metadata(&path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        return match std::fs::read_to_string(&path) {
+            Ok(s) => (
+                widget_from_lua(&s).unwrap_or_else(|e| {
+                    eprintln!("nock: {path:?}: {e}");
+                    default_row()
+                }),
+                Some((path, meta)),
+            ),
+            Err(e) => {
+                eprintln!("nock: {path:?}: {e}");
+                (default_row(), Some((path, SystemTime::now())))
+            }
+        };
     }
+    (default_row(), None)
+}
+
+pub fn reload_if_changed(nock: &mut Nock) {
+    let Some(path) = nock.config_file.as_ref() else {
+        return;
+    };
+    let Ok(modified) = fs::metadata(path).and_then(|m| m.modified()) else {
+        return;
+    };
+    if nock.config_mtime.is_some_and(|t| modified <= t) {
+        return;
+    }
+
+    let (root, meta) = load_root();
+    let (config_file, config_mtime) = match meta {
+        Some((p, t)) => (Some(p), Some(t)),
+        None => (None, None),
+    };
+    nock.root = root;
+    nock.config_mtime = config_mtime;
+    nock.config_file = config_file;
 }
 
 fn widget_from_lua(content: &str) -> Result<Widget, Box<dyn std::error::Error>> {

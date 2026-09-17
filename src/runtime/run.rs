@@ -18,7 +18,7 @@ use wayland_client::{Connection, globals::registry_queue_init};
 use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
-    config::lua_cfg::load_root,
+    config::lua_cfg::{load_root, reload_if_changed},
     runtime::{app::App, nock::Nock},
     theme::Theme,
 };
@@ -41,6 +41,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let id = SurfaceId::new(1);
     app.add_surface(id, FrameMode::Idle { animation_cap: 60 });
 
+    let (root, meta) = load_root();
+    let (config_file, config_mtime) = match meta {
+        Some((p, t)) => (Some(p), Some(t)),
+        None => (None, None),
+    };
+
     let mut nock = Nock {
         app,
         clock_id: id,
@@ -55,7 +61,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         height: 32,
         egl: None,
         theme: Theme::dark(),
-        root: load_root(),
+        root,
+        config_file,
+        config_mtime,
         hit_items: vec![],
         is_dark: true,
     };
@@ -77,6 +85,7 @@ fn clock(event_loop: &mut EventLoop<Nock>) {
         .insert_source(
             Timer::from_duration(Duration::from_secs(1)),
             |deadline, _, nock| {
+                reload_if_changed(nock);
                 Widget::set_clock(&mut nock.root, &format_now());
                 nock.app.mark_dirty(nock.clock_id);
 

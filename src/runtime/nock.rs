@@ -1,4 +1,8 @@
-use std::{ffi::c_void, time::Instant};
+use std::{
+    ffi::c_void,
+    path::PathBuf,
+    time::{Instant, SystemTime},
+};
 
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
@@ -43,6 +47,8 @@ pub struct Nock {
     pub exit: bool,
     pub egl: Option<Egl>,
     pub root: Widget,
+    pub config_file: Option<PathBuf>,
+    pub config_mtime: Option<SystemTime>,
     pub theme: Theme,
     pub hit_items: Vec<HitTarget>,
     pub is_dark: bool,
