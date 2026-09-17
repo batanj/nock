@@ -88,12 +88,14 @@ fn widget_from_table(table: &Table) -> Result<Widget, Box<dyn std::error::Error>
             id: table.get("id")?,
             on_click: table.get("on_click")?,
             command: table.get("command")?,
+            pad: table.get("pad").unwrap_or(0),
         },
         "clock" => Widget::Clock {
             text: table.get("text").unwrap_or_else(|_| String::new()),
             id: table.get("id")?,
             on_click: table.get("on_click")?,
             command: table.get("command")?,
+            pad: table.get("pad").unwrap_or(0),
         },
         "row" | "column" => {
             let children: Table = table.get("children")?;
@@ -121,6 +123,7 @@ pub fn default_row() -> Widget {
                 id: Some("brand".into()),
                 on_click: Some("toggle_theme".to_string()),
                 command: None,
+                pad: 8,
             },
             Widget::Spacer,
             Widget::Clock {
@@ -128,6 +131,7 @@ pub fn default_row() -> Widget {
                 id: None,
                 on_click: None,
                 command: None,
+                pad: 8,
             },
         ],
     }
@@ -140,12 +144,13 @@ mod tests {
     #[test]
     fn widget() {
         assert_eq!(
-            widget_from_lua(r#"return { kind = "label", text = "nock", id = "brand", on_click = "toggle_theme" }"#).unwrap(),
+            widget_from_lua(r#"return { kind = "label", text = "nock", id = "brand", on_click = "toggle_theme", pad = "0" }"#).unwrap(),
             Widget::Label {
                 text: "nock".to_string(),
                 id: Some("brand".to_string()),
                 on_click: Some("toggle_theme".to_string()),
                 command: None,
+                pad:0
             }
         );
     }
@@ -154,7 +159,7 @@ mod tests {
     fn command() {
         assert_eq!(
             widget_from_lua(
-                r#"return { kind = "label", text = "nock", on_click = "spawn", command = "echo" }"#
+                r#"return { kind = "label", text = "nock", on_click = "spawn", command = "echo", pad = "0" }"#
             )
             .unwrap(),
             Widget::Label {
@@ -162,6 +167,7 @@ mod tests {
                 id: None,
                 on_click: Some("spawn".to_string()),
                 command: Some("echo".to_string()),
+                pad: 0,
             }
         )
     }

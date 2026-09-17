@@ -1,5 +1,5 @@
 use crate::{
-    domain::layout::{Measure, Rect},
+    domain::{layout::Measure, widget::HitTarget},
     theme::Theme,
 };
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
@@ -135,19 +135,19 @@ impl Egl {
         Ok(())
     }
 
-    pub fn draw_label(&mut self, text: &str, rect: Rect, theme: &Theme) {
+    pub fn draw_label(&mut self, hit_target: &HitTarget, theme: &Theme) {
         let surface = &mut self.skia_surface;
         let canvas = surface.canvas();
 
         let mut paint = Paint::new(Color4f::new(theme.fg.0, theme.fg.1, theme.fg.2, 1.0), None); // white
         paint.set_anti_alias(true);
 
-        let x = rect.x as f32;
-        let y = rect.y as f32 + rect.height as f32 - 4.0;
+        let x = hit_target.rect.x as f32 + hit_target.pad as f32;
+        let y = hit_target.rect.y as f32 + hit_target.rect.height as f32 - 4.0;
 
         let origin = Point::new(x, y);
 
-        canvas.draw_str(text, origin, self.font.as_ref(), &paint);
+        canvas.draw_str(&hit_target.text, origin, self.font.as_ref(), &paint);
     }
 
     fn init_font(font_family: &str) -> Font {

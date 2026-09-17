@@ -69,7 +69,7 @@ impl Nock {
         self.hit_items = items.clone();
         egl.begin_frame(&self.theme);
         for ht in items {
-            egl.draw_label(&ht.text, ht.rect, &self.theme);
+            egl.draw_label(&ht, &self.theme);
         }
         egl.end_frame();
     }
