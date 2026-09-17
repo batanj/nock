@@ -23,7 +23,7 @@ use wayland_client::{
 use crate::{
     Action::Paint,
     SurfaceId, Widget,
-    domain::layout::{Constraints, Rect},
+    domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
     runtime::app::App,
     theme::Theme,
@@ -44,7 +44,7 @@ pub struct Nock {
     pub egl: Option<Egl>,
     pub root: Widget,
     pub theme: Theme,
-    pub hit_items: Vec<(Rect, String, Option<String>)>,
+    pub hit_items: Vec<HitTarget>,
     pub is_dark: bool,
 }
 
@@ -62,8 +62,8 @@ impl Nock {
         .1;
         self.hit_items = items.clone();
         egl.begin_frame(&self.theme);
-        for (rect, text, _id) in items {
-            egl.draw_label(&text, rect, &self.theme);
+        for ht in items {
+            egl.draw_label(&ht.text, ht.rect, &self.theme);
         }
         egl.end_frame();
     }
@@ -227,7 +227,9 @@ impl PointerHandler for Nock {
                 let x = event.position.0 as u32;
                 let y = event.position.1 as u32;
 
-                if let Some("brand") = Widget::hit(&self.hit_items, x, y) {
+                if let Some(t) = Widget::hit(&self.hit_items, x, y)
+                    && t.on_click.as_deref() == Some("toggle_theme")
+                {
                     if self.is_dark {
                         self.theme = Theme::light();
                         self.is_dark = false;
