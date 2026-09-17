@@ -256,7 +256,13 @@ impl PointerHandler for Nock {
                                 continue;
                             };
 
-                            if let Err(e) = std::process::Command::new(cmd).spawn() {
+                            let mut bits = cmd.split_whitespace();
+                            let Some(prog) = bits.next() else {
+                                eprintln!("nock: spawn missing command");
+                                continue;
+                            };
+
+                            if let Err(e) = std::process::Command::new(prog).args(bits).spawn() {
                                 eprintln!("nock: spawn {cmd}: {e}");
                             }
                         }

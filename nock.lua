@@ -4,6 +4,6 @@ return {
         { kind = "label", text = "nock from lua", id = "brand", on_click = "toggle_theme" },
         { kind = "spacer" },
         { kind = "clock" },
-        { kind = "label", text = "Kitty",         id = "kitty", on_click = "spawn",       command = "kitty" },
+        { kind = "label", text = "Kitty",         id = "kitty", on_click = "spawn",       command = "kitty --single-instance" },
     }
 }
