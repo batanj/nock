@@ -233,21 +233,35 @@ impl PointerHandler for Nock {
                 let x = event.position.0 as u32;
                 let y = event.position.1 as u32;
 
-                if let Some(t) = Widget::hit(&self.hit_items, x, y)
-                    && t.on_click.as_deref() == Some("toggle_theme")
-                {
-                    if self.is_dark {
-                        self.theme = Theme::light();
-                        self.is_dark = false;
-                    } else {
-                        self.theme = Theme::dark();
-                        self.is_dark = true;
-                    }
-                    self.app.mark_dirty(self.clock_id);
-                    for (id, action) in self.app.tick(Instant::now()) {
-                        if action == Paint && id == self.clock_id {
-                            self.draw();
+                if let Some(t) = Widget::hit(&self.hit_items, x, y) {
+                    match t.on_click.as_deref() {
+                        Some("toggle_theme") => {
+                            if self.is_dark {
+                                self.theme = Theme::light();
+                                self.is_dark = false;
+                            } else {
+                                self.theme = Theme::dark();
+                                self.is_dark = true;
+                            }
+                            self.app.mark_dirty(self.clock_id);
+                            for (id, action) in self.app.tick(Instant::now()) {
+                                if action == Paint && id == self.clock_id {
+                                    self.draw();
+                                }
+                            }
                         }
+                        Some("spawn") => {
+                            let Some(cmd) = t.command.as_deref() else {
+                                eprintln!("nock: spawn missing command");
+                                continue;
+                            };
+
+                            if let Err(e) = std::process::Command::new(cmd).spawn() {
+                                eprintln!("nock: spawn {cmd}: {e}");
+                            }
+                        }
+                        Some(other) => eprintln!("unknown on_click {other}"),
+                        None => {}
                     }
                 }
             }

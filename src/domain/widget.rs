@@ -8,12 +8,14 @@ pub enum Widget {
         text: String,
         id: Option<String>,
         on_click: Option<String>,
+        command: Option<String>,
     },
     Spacer,
     Clock {
         text: String,
         id: Option<String>,
         on_click: Option<String>,
+        command: Option<String>,
     },
     Row {
         children: Vec<Widget>,
@@ -29,15 +31,23 @@ pub struct HitTarget {
     pub text: String,
     pub id: Option<String>,
     pub on_click: Option<String>,
+    pub command: Option<String>,
 }
 
 impl HitTarget {
-    pub fn new(rect: Rect, text: String, id: Option<String>, on_click: Option<String>) -> Self {
+    pub fn new(
+        rect: Rect,
+        text: String,
+        id: Option<String>,
+        on_click: Option<String>,
+        command: Option<String>,
+    ) -> Self {
         Self {
             rect,
             text,
             id,
             on_click,
+            command,
         }
     }
 }
@@ -49,13 +59,25 @@ impl Widget {
         measurer: &impl Measure,
     ) -> (Size, Vec<HitTarget>) {
         match widget {
-            Widget::Label { text, id, on_click } | Widget::Clock { text, id, on_click } => {
+            Widget::Label {
+                text,
+                id,
+                on_click,
+                command,
+            }
+            | Widget::Clock {
+                text,
+                id,
+                on_click,
+                command,
+            } => {
                 let size = Size::new(measurer.text_width(text).min(constraints.max_width), 16);
                 let rects = vec![HitTarget::new(
                     Rect::new(0, 0, size.width, size.height),
                     text.clone(),
                     id.clone(),
                     on_click.clone(),
+                    command.clone(),
                 )];
                 (size, rects)
             }
@@ -93,6 +115,7 @@ impl Widget {
                             text,
                             id,
                             on_click,
+                            command,
                         } = ht;
                         all_rects.push(HitTarget::new(
                             Rect {
@@ -104,6 +127,7 @@ impl Widget {
                             text,
                             id,
                             on_click,
+                            command,
                         ));
                     }
                     x += child_size.width;
@@ -129,6 +153,7 @@ impl Widget {
                             text,
                             id,
                             on_click,
+                            command,
                         } = ht;
                         all_rects.push(HitTarget::new(
                             Rect {
@@ -140,6 +165,7 @@ impl Widget {
                             text,
                             id,
                             on_click,
+                            command,
                         ));
                     }
                     y += child_size.height;
@@ -162,6 +188,7 @@ impl Widget {
                 text,
                 id: _,
                 on_click: _,
+                command: _,
             } => *text = s.into(),
             Widget::Row { children } | Widget::Column { children } => {
                 for c in children {
@@ -220,6 +247,7 @@ mod tests {
                 text: String::from("ab"),
                 id: None,
                 on_click: None,
+                command: None,
             }],
         };
         assert_eq!(
@@ -229,7 +257,8 @@ mod tests {
                     Rect::new(0, 0, 16, 16),
                     "ab".into(),
                     None,
-                    None
+                    None,
+                    None,
                 )]
             ),
             Widget::layout(
@@ -252,12 +281,14 @@ mod tests {
                     text: "a".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
                 Widget::Row { children: vec![] },
                 Widget::Label {
                     text: "ab".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
             ],
         };
@@ -265,8 +296,8 @@ mod tests {
             (
                 Size::new(24, 16),
                 vec![
-                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None),
-                    HitTarget::new(Rect::new(8, 0, 16, 16), "ab".into(), None, None)
+                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None, None,),
+                    HitTarget::new(Rect::new(8, 0, 16, 16), "ab".into(), None, None, None,)
                 ]
             ),
             Widget::layout(
@@ -288,6 +319,7 @@ mod tests {
                 text: "abcd".into(),
                 id: None,
                 on_click: None,
+                command: None,
             }],
         };
 
@@ -298,7 +330,8 @@ mod tests {
                     Rect::new(0, 0, 16, 16),
                     "abcd".into(),
                     None,
-                    None
+                    None,
+                    None,
                 )]
             ),
             Widget::layout(
@@ -321,12 +354,14 @@ mod tests {
                     text: "a".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
                 Widget::Spacer,
                 Widget::Label {
                     text: "b".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
             ],
         };
@@ -334,8 +369,8 @@ mod tests {
             (
                 Size::new(100, 16),
                 vec![
-                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None),
-                    HitTarget::new(Rect::new(92, 0, 8, 16), "b".into(), None, None)
+                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None, None,),
+                    HitTarget::new(Rect::new(92, 0, 8, 16), "b".into(), None, None, None,)
                 ]
             ),
             Widget::layout(
@@ -358,12 +393,14 @@ mod tests {
                     text: "a".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
                 Widget::Spacer,
                 Widget::Clock {
                     text: "b".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
             ],
         };
@@ -371,8 +408,8 @@ mod tests {
             (
                 Size::new(100, 16),
                 vec![
-                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None),
-                    HitTarget::new(Rect::new(92, 0, 8, 16), "b".into(), None, None),
+                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None, None),
+                    HitTarget::new(Rect::new(92, 0, 8, 16), "b".into(), None, None, None),
                 ]
             ),
             Widget::layout(
@@ -395,11 +432,13 @@ mod tests {
                     text: "a".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
                 Widget::Label {
                     text: "ab".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
             ],
         };
@@ -407,8 +446,8 @@ mod tests {
             (
                 Size::new(16, 32),
                 vec![
-                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None),
-                    HitTarget::new(Rect::new(0, 16, 16, 16), "ab".into(), None, None),
+                    HitTarget::new(Rect::new(0, 0, 8, 16), "a".into(), None, None, None,),
+                    HitTarget::new(Rect::new(0, 16, 16, 16), "ab".into(), None, None, None,),
                 ]
             ),
             Widget::layout(
@@ -431,12 +470,14 @@ mod tests {
                     text: "a".into(),
                     id: Some("brand".into()),
                     on_click: Some("toggle_theme".into()),
+                    command: None,
                 },
                 Widget::Spacer,
                 Widget::Label {
                     text: "b".into(),
                     id: None,
                     on_click: None,
+                    command: None,
                 },
             ],
         };
@@ -455,7 +496,8 @@ mod tests {
                 Rect::new(0, 0, 8, 16),
                 "a".to_string(),
                 Some("brand".to_string()),
-                Some("toggle_theme".to_string())
+                Some("toggle_theme".to_string()),
+                None,
             ))
         );
         assert_eq!(
@@ -463,6 +505,7 @@ mod tests {
             Some(&HitTarget::new(
                 Rect::new(92, 0, 8, 16),
                 "b".to_string(),
+                None,
                 None,
                 None,
             ))

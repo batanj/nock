@@ -87,11 +87,13 @@ fn widget_from_table(table: &Table) -> Result<Widget, Box<dyn std::error::Error>
             text: table.get("text")?,
             id: table.get("id")?,
             on_click: table.get("on_click")?,
+            command: table.get("command")?,
         },
         "clock" => Widget::Clock {
             text: table.get("text").unwrap_or_else(|_| String::new()),
             id: table.get("id")?,
             on_click: table.get("on_click")?,
+            command: table.get("command")?,
         },
         "row" | "column" => {
             let children: Table = table.get("children")?;
@@ -118,12 +120,14 @@ pub fn default_row() -> Widget {
                 text: "nock".into(),
                 id: Some("brand".into()),
                 on_click: Some("toggle_theme".to_string()),
+                command: None,
             },
             Widget::Spacer,
             Widget::Clock {
                 text: "".into(),
                 id: None,
                 on_click: None,
+                command: None,
             },
         ],
     }
@@ -140,8 +144,25 @@ mod tests {
             Widget::Label {
                 text: "nock".to_string(),
                 id: Some("brand".to_string()),
-                on_click: Some("toggle_theme".to_string())
+                on_click: Some("toggle_theme".to_string()),
+                command: None,
             }
         );
+    }
+
+    #[test]
+    fn command() {
+        assert_eq!(
+            widget_from_lua(
+                r#"return { kind = "label", text = "nock", on_click = "spawn", command = "echo" }"#
+            )
+            .unwrap(),
+            Widget::Label {
+                text: "nock".to_string(),
+                id: None,
+                on_click: Some("spawn".to_string()),
+                command: Some("echo".to_string()),
+            }
+        )
     }
 }
