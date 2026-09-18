@@ -81,6 +81,14 @@ impl Nock {
         }
         egl.end_frame();
     }
+    fn request_paint(&mut self) {
+        self.app.mark_dirty(self.clock_id);
+        for (id, action) in self.app.tick(Instant::now()) {
+            if action == Paint && id == self.clock_id {
+                self.draw();
+            }
+        }
+    }
 }
 
 impl CompositorHandler for Nock {
@@ -179,14 +187,7 @@ impl LayerShellHandler for Nock {
                 .expect("egl resize");
         }
 
-        self.app.mark_dirty(self.clock_id);
-
-        let now = std::time::Instant::now();
-        for (id, action) in self.app.tick(now) {
-            if action == crate::Action::Paint && id == self.clock_id {
-                self.draw();
-            }
-        }
+        self.request_paint();
     }
 }
 
@@ -237,16 +238,13 @@ impl PointerHandler for Nock {
                     let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
                     if new != self.hover_id {
                         self.hover_id = new;
-                        self.app.mark_dirty(self.clock_id);
-                        for (id, action) in self.app.tick(Instant::now()) {
-                            if action == Paint && id == self.clock_id {
-                                self.draw();
-                            }
-                        }
+                        self.request_paint();
                     }
                 }
                 PointerEventKind::Leave { serial: _ } => {
-                    self.hover_id = None;
+                    if self.hover_id.take().is_some() {
+                        self.request_paint();
+                    }
                 }
                 PointerEventKind::Axis {
                     time: _,
@@ -275,12 +273,7 @@ impl PointerHandler for Nock {
                             .status();
 
                         Widget::set_volume(&mut self.root, &volume_text());
-                        self.app.mark_dirty(self.clock_id);
-                        for (id, action) in self.app.tick(Instant::now()) {
-                            if action == Paint && id == self.clock_id {
-                                self.draw();
-                            }
-                        }
+                        self.request_paint();
                     }
                 }
 
@@ -303,12 +296,7 @@ impl PointerHandler for Nock {
                                     self.theme = Theme::dark();
                                     self.is_dark = true;
                                 }
-                                self.app.mark_dirty(self.clock_id);
-                                for (id, action) in self.app.tick(Instant::now()) {
-                                    if action == Paint && id == self.clock_id {
-                                        self.draw();
-                                    }
-                                }
+                                self.request_paint();
                             }
                             Some("spawn") => {
                                 let Some(cmd) = t.command.as_deref() else {
@@ -331,23 +319,13 @@ impl PointerHandler for Nock {
                                     && id == "volume"
                                 {
                                     Widget::set_volume(&mut self.root, &volume_text());
-                                    self.app.mark_dirty(self.clock_id);
-                                    for (id, action) in self.app.tick(Instant::now()) {
-                                        if action == Paint && id == self.clock_id {
-                                            self.draw();
-                                        }
-                                    }
+                                    self.request_paint();
                                 }
                             }
                             Some("toggle_clock") => {
                                 self.hour12 = !self.hour12;
                                 Widget::set_clock(&mut self.root, &format_now(self.hour12));
-                                self.app.mark_dirty(self.clock_id);
-                                for (id, action) in self.app.tick(Instant::now()) {
-                                    if action == Paint && id == self.clock_id {
-                                        self.draw();
-                                    }
-                                }
+                                self.request_paint();
                             }
                             Some(other) => eprintln!("unknown on_click {other}"),
                             None => {}
