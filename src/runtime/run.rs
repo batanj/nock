@@ -17,8 +17,8 @@ use wayland_client::{Connection, globals::registry_queue_init};
 use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
-    clock_fmt::format_now,
     config::lua_cfg::{load_root, reload_if_changed},
+    datetime_fmt::{format_date, format_now},
     runtime::{app::App, nock::Nock},
     theme::Theme,
 };
@@ -89,8 +89,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
             |deadline, _, nock| {
                 reload_if_changed(nock);
                 Widget::set_clock(&mut nock.root, &format_now(nock.hour12));
-
-                reload_if_changed(nock);
+                Widget::set_date(&mut nock.root, &format_date());
 
                 nock.app.mark_dirty(nock.clock_id);
 

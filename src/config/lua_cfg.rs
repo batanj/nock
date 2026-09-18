@@ -97,6 +97,13 @@ fn widget_from_table(table: &Table) -> Result<Widget, Box<dyn std::error::Error>
             command: table.get("command")?,
             pad: table.get("pad").unwrap_or(0),
         },
+        "date" => Widget::Date {
+            text: table.get("text").unwrap_or_else(|_| String::new()),
+            id: table.get("id")?,
+            on_click: table.get("on_click")?,
+            command: table.get("command")?,
+            pad: table.get("pad").unwrap_or(0),
+        },
         "row" | "column" => {
             let children: Table = table.get("children")?;
             let mut vec = vec![];
@@ -128,7 +135,14 @@ pub fn default_row() -> Widget {
             Widget::Spacer,
             Widget::Clock {
                 text: "".into(),
-                id: None,
+                id: Some("clock".into()),
+                on_click: None,
+                command: None,
+                pad: 8,
+            },
+            Widget::Date {
+                text: "".into(),
+                id: Some("date".into()),
                 on_click: None,
                 command: None,
                 pad: 8,

@@ -27,7 +27,7 @@ use wayland_client::{
 use crate::{
     Action::Paint,
     SurfaceId, Widget,
-    clock_fmt::format_now,
+    datetime_fmt::format_now,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
     runtime::app::App,
