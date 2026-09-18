@@ -1,6 +1,7 @@
 use std::{
     ffi::c_void,
     path::PathBuf,
+    process::Command,
     time::{Instant, SystemTime},
 };
 
@@ -247,6 +248,42 @@ impl PointerHandler for Nock {
                 PointerEventKind::Leave { serial: _ } => {
                     self.hover_id = None;
                 }
+                PointerEventKind::Axis {
+                    time: _,
+                    horizontal: _,
+                    vertical,
+                    source: _,
+                } => {
+                    if event.surface != *self.layer_surface.wl_surface() {
+                        continue;
+                    }
+                    if Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.as_deref())
+                        != Some("volume")
+                    {
+                        continue;
+                    }
+
+                    if vertical.absolute != 0.0 {
+                        let delta = if vertical.absolute > 0.0 {
+                            "5%+"
+                        } else {
+                            "5%-"
+                        };
+
+                        let _ = Command::new("wpctl")
+                            .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", delta])
+                            .status();
+
+                        Widget::set_volume(&mut self.root, &volume_text());
+                        self.app.mark_dirty(self.clock_id);
+                        for (id, action) in self.app.tick(Instant::now()) {
+                            if action == Paint && id == self.clock_id {
+                                self.draw();
+                            }
+                        }
+                    }
+                }
+
                 PointerEventKind::Press {
                     time: _,
                     button: _,

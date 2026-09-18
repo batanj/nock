@@ -56,7 +56,7 @@ pub fn volume_text() -> String {
         .args(["get-volume", "@DEFAULT_AUDIO_SINK@"])
         .output()
     {
-        Ok(output) if output.status.success() => {
+        Ok(output) => {
             let text = String::from_utf8_lossy(&output.stdout);
             let is_muted = text.contains("[MUTED]");
 
