@@ -28,7 +28,7 @@ use crate::{
     Action::Paint,
     SurfaceId, Widget,
     domain::{layout::Constraints, widget::HitTarget},
-    format::format_now,
+    format::{format_now, volume_text},
     gfx::egl::Egl,
     runtime::app::App,
     theme::Theme,
@@ -288,6 +288,18 @@ impl PointerHandler for Nock {
                                 if let Err(e) = std::process::Command::new(prog).args(bits).spawn()
                                 {
                                     eprintln!("nock: spawn {cmd}: {e}");
+                                }
+
+                                if let Some(id) = &t.id
+                                    && id == "volume"
+                                {
+                                    Widget::set_volume(&mut self.root, &volume_text());
+                                    self.app.mark_dirty(self.clock_id);
+                                    for (id, action) in self.app.tick(Instant::now()) {
+                                        if action == Paint && id == self.clock_id {
+                                            self.draw();
+                                        }
+                                    }
                                 }
                             }
                             Some("toggle_clock") => {

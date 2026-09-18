@@ -18,7 +18,7 @@ use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
     config::lua_cfg::{load_root, reload_if_changed},
-    format::{battery_text, format_date, format_now},
+    format::{battery_text, format_date, format_now, volume_text},
     runtime::{app::App, nock::Nock},
     theme::Theme,
 };
@@ -91,6 +91,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
                 Widget::set_clock(&mut nock.root, &format_now(nock.hour12));
                 Widget::set_date(&mut nock.root, &format_date());
                 Widget::set_battery(&mut nock.root, &battery_text());
+                Widget::set_volume(&mut nock.root, &volume_text());
 
                 nock.app.mark_dirty(nock.clock_id);
 

@@ -4,7 +4,7 @@ use crate::{
 };
 use khronos_egl::{self as egl, DynamicInstance, EGL1_5, OPENGL_ES_API};
 use skia_safe::{
-    Color4f, ColorType, Font, FontMgr, Paint, Point, Surface,
+    Color4f, ColorType, Font, FontMgr, FontStyle, Paint, Point, Surface,
     gpu::{
         self,
         gl::{Format::RGBA8, Interface},
@@ -90,7 +90,7 @@ impl Egl {
         // wrap_skia
         let skia_surface = Egl::wrap_skia(&mut gr_context, width, height)?;
 
-        let font_family = "Noto Sans";
+        let font_family = "JetBrainsMono Nerd Font";
         let font = Egl::init_font(font_family);
 
         Ok(Self {
@@ -154,8 +154,9 @@ impl Egl {
         let font_mgr = FontMgr::new();
         let typeface = font_mgr
             .match_family_style(font_family, skia_safe::FontStyle::normal())
+            .or_else(|| font_mgr.match_family_style("Noto Sans", FontStyle::normal()))
             .expect("error loading preferred font");
-        let font_size = 16.0;
+        let font_size = 14.0;
         Font::from_typeface(typeface, font_size)
     }
 

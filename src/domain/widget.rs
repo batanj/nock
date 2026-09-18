@@ -33,6 +33,13 @@ pub enum Widget {
         command: Option<String>,
         pad: u32,
     },
+    Volume {
+        text: String,
+        id: Option<String>,
+        on_click: Option<String>,
+        command: Option<String>,
+        pad: u32,
+    },
     Row {
         children: Vec<Widget>,
     },
@@ -100,6 +107,13 @@ impl Widget {
                 pad,
             }
             | Widget::Battery {
+                text,
+                id,
+                on_click,
+                command,
+                pad,
+            }
+            | Widget::Volume {
                 text,
                 id,
                 on_click,
@@ -286,6 +300,24 @@ impl Widget {
             Widget::Row { children } | Widget::Column { children } => {
                 for c in children {
                     Widget::set_battery(c, s);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn set_volume(widget: &mut Widget, s: &str) {
+        match widget {
+            Widget::Volume {
+                text,
+                id: _,
+                on_click: _,
+                command: _,
+                pad: _,
+            } => *text = s.into(),
+            Widget::Row { children } | Widget::Column { children } => {
+                for c in children {
+                    Widget::set_volume(c, s);
                 }
             }
             _ => {}
