@@ -1,4 +1,4 @@
-pub mod datetime_fmt;
+pub mod format;
 pub mod frame;
 pub mod layout;
 pub mod surface;

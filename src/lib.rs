@@ -1,5 +1,5 @@
 pub mod domain;
-pub use domain::{Action, Budget, FrameMode, Surface, SurfaceId, Widget, datetime_fmt};
+pub use domain::{Action, Budget, FrameMode, Surface, SurfaceId, Widget, format};
 pub mod config;
 pub mod gfx;
 pub mod proto;
