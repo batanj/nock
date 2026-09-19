@@ -56,6 +56,7 @@ pub struct Nock {
     pub is_dark: bool,
     pub hover_id: Option<String>,
     pub hour12: bool,
+    pub last_net: Instant,
 }
 
 impl Nock {

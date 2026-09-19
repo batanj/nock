@@ -40,6 +40,13 @@ pub enum Widget {
         command: Option<String>,
         pad: u32,
     },
+    Network {
+        text: String,
+        id: Option<String>,
+        on_click: Option<String>,
+        command: Option<String>,
+        pad: u32,
+    },
     Row {
         children: Vec<Widget>,
     },
@@ -114,6 +121,13 @@ impl Widget {
                 pad,
             }
             | Widget::Volume {
+                text,
+                id,
+                on_click,
+                command,
+                pad,
+            }
+            | Widget::Network {
                 text,
                 id,
                 on_click,
@@ -318,6 +332,24 @@ impl Widget {
             Widget::Row { children } | Widget::Column { children } => {
                 for c in children {
                     Widget::set_volume(c, s);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn set_network(widget: &mut Widget, s: &str) {
+        match widget {
+            Widget::Network {
+                text,
+                id: _,
+                on_click: _,
+                command: _,
+                pad: _,
+            } => *text = s.into(),
+            Widget::Row { children } | Widget::Column { children } => {
+                for c in children {
+                    Widget::set_network(c, s);
                 }
             }
             _ => {}

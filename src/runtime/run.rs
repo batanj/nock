@@ -1,4 +1,7 @@
-use std::{error::Error, time::Duration};
+use std::{
+    error::Error,
+    time::{Duration, Instant},
+};
 
 use calloop::{EventLoop, timer::Timer};
 use calloop_wayland_source::WaylandSource;
@@ -18,7 +21,7 @@ use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
     config::lua_cfg::{load_root, reload_if_changed},
-    format::{battery_text, format_date, format_now, volume_text},
+    format::{battery_text, format_date, format_now, network_text, volume_text},
     runtime::{app::App, nock::Nock},
     theme::Theme,
 };
@@ -68,6 +71,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         is_dark: true,
         hover_id: None,
         hour12: true,
+        last_net: Instant::now() - Duration::from_secs(31),
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
@@ -92,6 +96,11 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
                 Widget::set_date(&mut nock.root, &format_date());
                 Widget::set_battery(&mut nock.root, &battery_text());
                 Widget::set_volume(&mut nock.root, &volume_text());
+
+                if Instant::now().duration_since(nock.last_net) > Duration::from_secs(30) {
+                    Widget::set_network(&mut nock.root, &network_text());
+                    nock.last_net = Instant::now();
+                }
 
                 nock.app.mark_dirty(nock.clock_id);
 

@@ -74,3 +74,21 @@ pub fn volume_text() -> String {
         _ => String::new(),
     }
 }
+
+pub fn network_text() -> String {
+    match Command::new("nmcli")
+        .args(["-t", "-f", "ACTIVE,SSID", "dev", "wifi"])
+        .output()
+    {
+        Ok(output) => {
+            let text = String::from_utf8_lossy(&output.stdout);
+
+            text.lines()
+                .find(|line| line.contains("yes:"))
+                .and_then(|line| line.strip_prefix("yes:").map(str::trim))
+                .unwrap_or_default()
+                .to_string()
+        }
+        _ => String::new(),
+    }
+}
