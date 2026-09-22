@@ -226,9 +226,7 @@ impl LayerShellHandler for Nock {
                     )
                     .expect("panel egl bind"),
                 );
-                println!("binding p.egl");
             } else if size_changed {
-                println!("p.egl size changed");
                 p.egl
                     .as_mut()
                     .map(|e| Some(e.resize(new_w as i32, new_h as i32)));
@@ -274,7 +272,7 @@ impl PointerHandler for Nock {
     fn pointer_frame(
         &mut self,
         _conn: &Connection,
-        qh: &QueueHandle<Self>,
+        _qh: &QueueHandle<Self>,
         _pointer: &wayland_client::protocol::wl_pointer::WlPointer,
         events: &[smithay_client_toolkit::seat::pointer::PointerEvent],
     ) {
@@ -386,14 +384,6 @@ impl PointerHandler for Nock {
                                 }
 
                                 if let Some(ref mut panel) = self.panel {
-                                    if panel.layer.is_none() {
-                                        Panel::create(
-                                            &self.layer_shell,
-                                            &self.compositor_state,
-                                            qh,
-                                        )
-                                        .ok();
-                                    }
                                     Panel::show(panel);
                                     panel.draw(&self.theme);
                                 }

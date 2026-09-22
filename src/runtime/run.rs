@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use calloop::{EventLoop, timer::Timer};
+use calloop::{EventLoop, channel, timer::Timer};
 use calloop_wayland_source::WaylandSource;
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -85,7 +85,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         is_dark: true,
         hover_id: None,
         hour12: true,
-        last_net: Instant::now() - Duration::from_secs(31),
+        last_net: Instant::now(),
     };
 
     let mut event_loop = EventLoop::<Nock>::try_new()?;
@@ -101,19 +101,38 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
 pub fn clock(event_loop: &mut EventLoop<Nock>) {
     let handle = event_loop.handle();
+
+    let (sender, channel_source) = channel::channel::<String>();
+
+    handle
+        .insert_source(channel_source, |event, _, nock| {
+            if let channel::Event::Msg(network_string) = event {
+                Widget::set_network(&mut nock.root, &network_string);
+                nock.app.mark_dirty(nock.clock_id);
+                nock.draw();
+            }
+        })
+        .expect("Failed to insert channel source");
+
     handle
         .insert_source(
             Timer::from_duration(Duration::from_secs(1)),
-            |deadline, _, nock| {
+            move |deadline, _, nock| {
                 reload_if_changed(nock);
                 Widget::set_clock(&mut nock.root, &format_now(nock.hour12));
                 Widget::set_date(&mut nock.root, &format_date());
                 Widget::set_battery(&mut nock.root, &battery_text());
                 Widget::set_volume(&mut nock.root, &volume_text());
 
-                if Instant::now().duration_since(nock.last_net) > Duration::from_secs(30) {
-                    Widget::set_network(&mut nock.root, &network_text());
+                if Instant::now().duration_since(nock.last_net) > Duration::from_secs(10) {
                     nock.last_net = Instant::now();
+
+                    let sender_clone = sender.clone();
+
+                    std::thread::spawn(move || {
+                        let text = network_text();
+                        let _ = sender_clone.send(text);
+                    });
                 }
 
                 nock.app.mark_dirty(nock.clock_id);

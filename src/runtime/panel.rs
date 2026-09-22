@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use chrono::{Datelike, NaiveDate};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     shell::{
@@ -39,59 +40,76 @@ impl Panel {
             height,
             id,
             visible: false,
-            root: Widget::Column {
-                children: vec![
-                    Widget::Label {
-                        text: "Mon".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                    Widget::Label {
-                        text: "Tue".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                    Widget::Label {
-                        text: "Wed".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                    Widget::Label {
-                        text: "Thu".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                    Widget::Label {
-                        text: "Fri".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                    Widget::Label {
-                        text: "Sat".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                    Widget::Label {
-                        text: "Sun".to_string(),
-                        id: None,
-                        on_click: None,
-                        command: None,
-                        pad: 8,
-                    },
-                ],
+            root: Panel::date(),
+        }
+    }
+
+    pub fn date() -> Widget {
+        let current_date = chrono::Local::now();
+        let year = current_date.year();
+        let month = current_date.month();
+
+        let first_day = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
+        let (next_year, next_month) = if month == 12 {
+            (year + 1, 1)
+        } else {
+            (year, month + 1)
+        };
+        let first_of_next = NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap();
+        let total_days = (first_of_next - first_day).num_days();
+        let leading_spaces = first_day.weekday().num_days_from_sunday() as usize;
+
+        let day_pad = 4;
+
+        let days_header: Vec<Widget> = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+            .iter()
+            .map(|d| Widget::Label {
+                text: d.to_string(),
+                id: None,
+                on_click: None,
+                command: None,
+                pad: day_pad,
+            })
+            .collect();
+
+        let mut widget_column = vec![
+            Widget::Label {
+                text: current_date.format("%B %Y").to_string(),
+                id: None,
+                on_click: None,
+                command: None,
+                pad: 8,
             },
+            Widget::Row {
+                children: days_header,
+            },
+        ];
+
+        let mut days = (0..(leading_spaces + total_days as usize))
+            .map(|i| {
+                let text = match i {
+                    i if i < leading_spaces => String::from("  "),
+                    _ => format!("{:2}", (i - leading_spaces + 1)),
+                };
+                Widget::Label {
+                    text,
+                    id: None,
+                    on_click: None,
+                    command: None,
+                    pad: day_pad,
+                }
+            })
+            .collect::<Vec<Widget>>();
+
+        while !days.is_empty() {
+            let n = days.len().min(7);
+            let children = days.drain(..n).collect();
+
+            widget_column.push(Widget::Row { children });
+        }
+
+        Widget::Column {
+            children: widget_column,
         }
     }
 
@@ -112,7 +130,6 @@ impl Panel {
     }
 
     pub fn hide(panel: &mut Panel) {
-        println!("panel hiding?");
         panel.visible = false;
         if let Some(ref mut layer) = panel.layer {
             layer.set_size(1, 1);
@@ -120,10 +137,9 @@ impl Panel {
     }
 
     pub fn show(panel: &mut Panel) {
-        println!("panel showing?");
         panel.visible = true;
         if let Some(ref mut layer) = panel.layer {
-            layer.set_size(120, 240);
+            layer.set_size(240, 200);
         }
     }
 
