@@ -54,7 +54,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     // init panel
     let panel_id = SurfaceId::new(2);
     app.add_surface(panel_id, FrameMode::Idle { animation_cap: 60 });
-    // let panel_layer = panel::Panel::create(&layer_shell, &compositor, &qh)?;
+    let panel_layer = Some(Panel::create(&layer_shell, &compositor, &qh)?);
 
     let (root, meta) = load_root();
     let (config_file, config_mtime) = match meta {
@@ -76,13 +76,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         width: 0,
         height: 32,
         egl: None,
-        panel: Some(Panel {
-            egl: None,
-            id: panel_id,
-            height: 240,
-            width: 120,
-            layer: None,
-        }),
+        panel: Some(Panel::new(panel_layer, None, 0, 0, panel_id)),
         theme: Theme::dark(),
         root,
         config_file,

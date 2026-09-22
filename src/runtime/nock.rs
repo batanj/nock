@@ -217,7 +217,6 @@ impl LayerShellHandler for Nock {
             p.height = new_h;
 
             if p.egl.is_none() {
-                println!("binding p.egl");
                 p.egl = Some(
                     Egl::bind(
                         self.display_ptr,
@@ -226,7 +225,8 @@ impl LayerShellHandler for Nock {
                         p.height as i32,
                     )
                     .expect("panel egl bind"),
-                )
+                );
+                println!("binding p.egl");
             } else if size_changed {
                 println!("p.egl size changed");
                 p.egl
@@ -378,17 +378,23 @@ impl PointerHandler for Nock {
                             }
                             Some("toggle_panel") => {
                                 if let Some(ref mut panel) = self.panel
-                                    && panel.layer.is_some()
+                                    && panel.visible
                                 {
-                                    Panel::destroy(panel);
+                                    Panel::hide(panel);
+                                    panel.draw(&self.theme);
                                     continue;
                                 }
 
-                                if let Some(ref mut panel) = self.panel
-                                    && let Ok(layer) =
-                                        Panel::create(&self.layer_shell, &self.compositor_state, qh)
-                                {
-                                    panel.layer = Some(layer);
+                                if let Some(ref mut panel) = self.panel {
+                                    if panel.layer.is_none() {
+                                        Panel::create(
+                                            &self.layer_shell,
+                                            &self.compositor_state,
+                                            qh,
+                                        )
+                                        .ok();
+                                    }
+                                    Panel::show(panel);
                                     panel.draw(&self.theme);
                                 }
                             }
