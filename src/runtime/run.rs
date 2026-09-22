@@ -1,5 +1,7 @@
+use crate::runtime::panel::Panel;
 use std::{
     error::Error,
+    ffi::c_void,
     time::{Duration, Instant},
 };
 
@@ -28,10 +30,19 @@ use crate::{
 
 pub fn run() -> Result<(), Box<dyn Error>> {
     let conn = Connection::connect_to_env()?;
+
+    let display_ptr = conn.backend().display_ptr() as *mut c_void;
+
     let (globals, event_queue) = registry_queue_init::<Nock>(&conn)?;
     let qh = event_queue.handle();
-
     let compositor = CompositorState::bind(&globals, &qh)?;
+
+    let mut app = App::new();
+
+    let id = SurfaceId::new(1);
+    app.add_surface(id, FrameMode::Idle { animation_cap: 60 });
+
+    // init bar
     let layer_shell = LayerShell::bind(&globals, &qh)?;
     let surface = compositor.create_surface(&qh);
     let layer = layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("nock"), None);
@@ -40,9 +51,10 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     layer.set_size(0, 32);
     layer.wl_surface().commit();
 
-    let mut app = App::new();
-    let id = SurfaceId::new(1);
-    app.add_surface(id, FrameMode::Idle { animation_cap: 60 });
+    // init panel
+    let panel_id = SurfaceId::new(2);
+    app.add_surface(panel_id, FrameMode::Idle { animation_cap: 60 });
+    // let panel_layer = panel::Panel::create(&layer_shell, &compositor, &qh)?;
 
     let (root, meta) = load_root();
     let (config_file, config_mtime) = match meta {
@@ -60,9 +72,17 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
         layer_surface: layer,
+        display_ptr,
         width: 0,
         height: 32,
         egl: None,
+        panel: Some(Panel {
+            egl: None,
+            id: panel_id,
+            height: 240,
+            width: 120,
+            layer: None,
+        }),
         theme: Theme::dark(),
         root,
         config_file,

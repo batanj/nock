@@ -25,6 +25,7 @@ use wayland_client::{
     protocol::{wl_output, wl_surface},
 };
 
+use crate::runtime::panel::Panel;
 use crate::{
     Action::Paint,
     SurfaceId, Widget,
@@ -44,10 +45,12 @@ pub struct Nock {
     pub compositor_state: CompositorState,
     pub layer_shell: LayerShell,
     pub layer_surface: LayerSurface,
+    pub display_ptr: *mut c_void,
     pub width: u32,
     pub height: u32,
     pub exit: bool,
     pub egl: Option<Egl>,
+    pub panel: Option<Panel>,
     pub root: Widget,
     pub config_file: Option<PathBuf>,
     pub config_mtime: Option<SystemTime>,
@@ -140,55 +143,100 @@ impl CompositorHandler for Nock {
 }
 
 impl LayerShellHandler for Nock {
-    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
-        self.exit = true;
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, layer: &LayerSurface) {
+        if layer == &self.layer_surface {
+            self.exit = true;
+        } else if self.panel.as_ref().and_then(|p| p.layer.as_ref()) == Some(layer)
+            && let Some(p) = self.panel.as_mut()
+        {
+            p.layer = None;
+            p.egl = None;
+        }
     }
 
     fn configure(
         &mut self,
-        conn: &Connection,
+        _conn: &Connection,
         _qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
+        layer: &LayerSurface,
         configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        let mut new_w = self.width;
-        let mut new_h = self.height;
+        if layer == &self.layer_surface {
+            let mut new_w = self.width;
+            let mut new_h = self.height;
 
-        if configure.new_size.0 > 0 {
-            new_w = configure.new_size.0;
-        }
-        if configure.new_size.1 > 0 {
-            new_h = configure.new_size.1;
-        }
+            if configure.new_size.0 > 0 {
+                new_w = configure.new_size.0;
+            }
+            if configure.new_size.1 > 0 {
+                new_h = configure.new_size.1;
+            }
 
-        let size_changed = new_w != self.width || new_h != self.height;
+            let size_changed = new_w != self.width || new_h != self.height;
 
-        self.width = new_w;
-        self.height = new_h;
+            self.width = new_w;
+            self.height = new_h;
 
-        let display_ptr = conn.backend().display_ptr() as *mut c_void;
+            if self.egl.is_none() && self.width > 0 && self.height > 0 {
+                self.egl = Some(
+                    Egl::bind(
+                        self.display_ptr,
+                        self.layer_surface.wl_surface().id(),
+                        self.width as i32,
+                        self.height as i32,
+                    )
+                    .expect("egl bind"),
+                );
+            } else if let Some(ref mut egl) = self.egl
+                && size_changed
+                && new_w > 0
+                && new_h > 0
+            {
+                egl.resize(self.width as i32, self.height as i32)
+                    .expect("egl resize");
+            }
 
-        if self.egl.is_none() && self.width > 0 && self.height > 0 {
-            self.egl = Some(
-                Egl::bind(
-                    display_ptr,
-                    self.layer_surface.wl_surface().id(),
-                    self.width as i32,
-                    self.height as i32,
-                )
-                .expect("egl bind"),
-            );
-        } else if let Some(ref mut egl) = self.egl
-            && size_changed
-            && new_w > 0
-            && new_h > 0
+            self.request_paint();
+        } else if let Some(p) = self.panel.as_mut()
+            && Some(layer) == p.layer.as_ref()
         {
-            egl.resize(self.width as i32, self.height as i32)
-                .expect("egl resize");
-        }
+            let mut new_w = p.width;
+            let mut new_h = p.height;
 
-        self.request_paint();
+            if configure.new_size.0 > 0 {
+                new_w = configure.new_size.0;
+            }
+            if configure.new_size.1 > 0 {
+                new_h = configure.new_size.1;
+            }
+
+            let size_changed = new_w != p.width || new_h != p.height;
+
+            p.width = new_w;
+            p.height = new_h;
+
+            if p.egl.is_none() {
+                println!("binding p.egl");
+                p.egl = Some(
+                    Egl::bind(
+                        self.display_ptr,
+                        layer.wl_surface().id(),
+                        p.width as i32,
+                        p.height as i32,
+                    )
+                    .expect("panel egl bind"),
+                )
+            } else if size_changed {
+                println!("p.egl size changed");
+                p.egl
+                    .as_mut()
+                    .map(|e| Some(e.resize(new_w as i32, new_h as i32)));
+            }
+
+            p.draw(&self.theme);
+            self.app.mark_dirty(p.id);
+        }
     }
 }
 
@@ -226,7 +274,7 @@ impl PointerHandler for Nock {
     fn pointer_frame(
         &mut self,
         _conn: &Connection,
-        _qh: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _pointer: &wayland_client::protocol::wl_pointer::WlPointer,
         events: &[smithay_client_toolkit::seat::pointer::PointerEvent],
     ) {
@@ -327,6 +375,22 @@ impl PointerHandler for Nock {
                                 self.hour12 = !self.hour12;
                                 Widget::set_clock(&mut self.root, &format_now(self.hour12));
                                 self.request_paint();
+                            }
+                            Some("toggle_panel") => {
+                                if let Some(ref mut panel) = self.panel
+                                    && panel.layer.is_some()
+                                {
+                                    Panel::destroy(panel);
+                                    continue;
+                                }
+
+                                if let Some(ref mut panel) = self.panel
+                                    && let Ok(layer) =
+                                        Panel::create(&self.layer_shell, &self.compositor_state, qh)
+                                {
+                                    panel.layer = Some(layer);
+                                    panel.draw(&self.theme);
+                                }
                             }
                             Some(other) => eprintln!("unknown on_click {other}"),
                             None => {}
