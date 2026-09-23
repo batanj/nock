@@ -87,13 +87,21 @@ impl Panel {
 
         let mut days = (0..(leading_spaces + total_days as usize))
             .map(|i| {
+                let day = (i + 1).saturating_sub(leading_spaces);
                 let text = match i {
                     i if i < leading_spaces => String::from("  "),
-                    _ => format!("{:2}", (i - leading_spaces + 1)),
+                    _ => format!("{:2}", day),
                 };
+
+                let id = if day as u32 == current_date.day() {
+                    Some(String::from("highlight"))
+                } else {
+                    None
+                };
+
                 Widget::Label {
                     text,
-                    id: None,
+                    id,
                     on_click: None,
                     command: None,
                     pad: day_pad,
@@ -156,7 +164,13 @@ impl Panel {
             .1;
             egl.begin_frame(theme);
             for ht in items {
-                egl.draw_label(&ht, theme);
+                if let Some(id) = &ht.id
+                    && id == &String::from("highlight")
+                {
+                    egl.draw_label(&ht, &Theme::hover());
+                } else {
+                    egl.draw_label(&ht, theme);
+                }
             }
             egl.end_frame();
         }
