@@ -282,6 +282,14 @@ impl PointerHandler for Nock {
 
             match &event.kind {
                 PointerEventKind::Motion { time: _ } => {
+                    if let Some(panel) = &mut self.panel
+                        && panel.visible
+                        && let Some(layer) = &panel.layer
+                        && &event.surface == layer.wl_surface()
+                    {
+                        continue;
+                    }
+
                     let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
                     if new != self.hover_id {
                         self.hover_id = new;
@@ -289,6 +297,14 @@ impl PointerHandler for Nock {
                     }
                 }
                 PointerEventKind::Leave { serial: _ } => {
+                    if let Some(panel) = &mut self.panel
+                        && panel.visible
+                        && let Some(layer) = &panel.layer
+                        && &event.surface == layer.wl_surface()
+                    {
+                        continue;
+                    }
+
                     if self.hover_id.take().is_some() {
                         self.request_paint();
                     }
@@ -329,6 +345,43 @@ impl PointerHandler for Nock {
                     button: _,
                     serial: _,
                 } => {
+                    if let Some(panel) = &mut self.panel
+                        && panel.visible
+                        && let Some(layer) = &panel.layer
+                        && &event.surface == layer.wl_surface()
+                    {
+                        if let Some(t) = Widget::hit(&panel.hit_items, x, y) {
+                            match t.id.as_deref() {
+                                Some("prev") => {
+                                    panel.month = {
+                                        if panel.month == 1 {
+                                            panel.year -= 1;
+                                            12
+                                        } else {
+                                            panel.month.saturating_sub(1)
+                                        }
+                                    };
+                                    panel.root = Panel::month_grid(panel.year, panel.month);
+                                    panel.draw(&self.theme);
+                                }
+                                Some("next") => {
+                                    panel.month = {
+                                        if panel.month == 12 {
+                                            panel.year += 1;
+                                            1
+                                        } else {
+                                            panel.month.saturating_add(1)
+                                        }
+                                    };
+                                    panel.root = Panel::month_grid(panel.year, panel.month);
+                                    panel.draw(&self.theme);
+                                }
+                                _ => {}
+                            }
+                        }
+                        continue;
+                    }
+
                     if event.surface != *self.layer_surface.wl_surface() {
                         continue;
                     }

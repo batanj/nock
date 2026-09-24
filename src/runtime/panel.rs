@@ -11,7 +11,10 @@ use smithay_client_toolkit::{
 use wayland_client::QueueHandle;
 
 use crate::{
-    SurfaceId, Widget, domain::layout::Constraints, gfx::egl::Egl, runtime::nock::Nock,
+    SurfaceId, Widget,
+    domain::{layout::Constraints, widget::HitTarget},
+    gfx::egl::Egl,
+    runtime::nock::Nock,
     theme::Theme,
 };
 
@@ -23,6 +26,9 @@ pub struct Panel {
     pub id: SurfaceId,
     pub root: Widget,
     pub visible: bool,
+    pub year: i32,
+    pub month: u32,
+    pub hit_items: Vec<HitTarget>,
 }
 
 impl Panel {
@@ -33,6 +39,8 @@ impl Panel {
         height: u32,
         id: SurfaceId,
     ) -> Self {
+        let cur = chrono::Local::now();
+        let (year, month) = (cur.year(), cur.month());
         Self {
             layer,
             egl,
@@ -40,14 +48,16 @@ impl Panel {
             height,
             id,
             visible: false,
-            root: Panel::date(),
+            root: Panel::month_grid(year, month),
+            year,
+            month,
+            hit_items: vec![],
         }
     }
 
-    pub fn date() -> Widget {
+    pub fn month_grid(year: i32, month: u32) -> Widget {
         let current_date = chrono::Local::now();
-        let year = current_date.year();
-        let month = current_date.month();
+        let date = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
 
         let first_day = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
         let (next_year, next_month) = if month == 12 {
@@ -59,7 +69,7 @@ impl Panel {
         let total_days = (first_of_next - first_day).num_days();
         let leading_spaces = first_day.weekday().num_days_from_sunday() as usize;
 
-        let day_pad = 4;
+        let day_pad = 8;
 
         let days_header: Vec<Widget> = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
             .iter()
@@ -73,12 +83,30 @@ impl Panel {
             .collect();
 
         let mut widget_column = vec![
-            Widget::Label {
-                text: current_date.format("%B %Y").to_string(),
-                id: None,
-                on_click: None,
-                command: None,
-                pad: 8,
+            Widget::Row {
+                children: vec![
+                    Widget::Label {
+                        text: String::from("<"),
+                        id: Some("prev".to_string()),
+                        on_click: None,
+                        command: None,
+                        pad: day_pad,
+                    },
+                    Widget::Label {
+                        text: date.format("%B %Y").to_string(),
+                        id: None,
+                        on_click: None,
+                        command: None,
+                        pad: day_pad,
+                    },
+                    Widget::Label {
+                        text: String::from(">"),
+                        id: Some("next".to_string()),
+                        on_click: None,
+                        command: None,
+                        pad: day_pad,
+                    },
+                ],
             },
             Widget::Row {
                 children: days_header,
@@ -93,7 +121,7 @@ impl Panel {
                     _ => format!("{:2}", day),
                 };
 
-                let id = if day as u32 == current_date.day() {
+                let id = if day as u32 == current_date.day() && month == current_date.month() {
                     Some(String::from("highlight"))
                 } else {
                     None
@@ -162,6 +190,7 @@ impl Panel {
                 egl,
             )
             .1;
+            self.hit_items = items.clone();
             egl.begin_frame(theme);
             for ht in items {
                 if let Some(id) = &ht.id
