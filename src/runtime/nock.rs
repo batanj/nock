@@ -380,13 +380,9 @@ impl PointerHandler for Nock {
                             }
                         }
                         continue;
-                    }
-
-                    if event.surface != *self.layer_surface.wl_surface() {
+                    } else if event.surface != *self.layer_surface.wl_surface() {
                         continue;
-                    }
-
-                    if let Some(t) = Widget::hit(&self.hit_items, x, y) {
+                    } else if let Some(t) = Widget::hit(&self.hit_items, x, y) {
                         match t.on_click.as_deref() {
                             Some("toggle_theme") => {
                                 if self.is_dark {
@@ -444,6 +440,11 @@ impl PointerHandler for Nock {
                             Some(other) => eprintln!("unknown on_click {other}"),
                             None => {}
                         }
+                    } else if let Some(panel) = self.panel.as_mut()
+                        && panel.visible
+                    {
+                        Panel::hide(panel);
+                        panel.draw(&self.theme);
                     }
                 }
                 _ => {}
