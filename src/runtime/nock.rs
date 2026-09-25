@@ -13,6 +13,7 @@ use smithay_client_toolkit::{
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
+        keyboard::KeyboardHandler,
         pointer::{PointerEventKind, PointerHandler},
     },
     shell::{
@@ -268,6 +269,79 @@ impl OutputHandler for Nock {
     }
 }
 
+impl KeyboardHandler for Nock {
+    fn enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        _surface: &wl_surface::WlSurface,
+        _serial: u32,
+        _raw: &[u32],
+        _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
+    ) {
+    }
+
+    fn leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        _surface: &wl_surface::WlSurface,
+        _serial: u32,
+    ) {
+    }
+
+    fn press_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+        if event.keysym == smithay_client_toolkit::seat::keyboard::Keysym::Escape
+            && let Some(panel) = &mut self.panel
+            && panel.visible
+        {
+            Panel::hide(panel);
+            panel.draw(&self.theme);
+        }
+    }
+
+    fn repeat_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+    }
+
+    fn release_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+    }
+
+    fn update_modifiers(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
+        _raw_modifiers: smithay_client_toolkit::seat::keyboard::RawModifiers,
+        _layout: u32,
+    ) {
+    }
+}
+
 impl PointerHandler for Nock {
     fn pointer_frame(
         &mut self,
@@ -472,6 +546,9 @@ impl SeatHandler for Nock {
     ) {
         if capability == Capability::Pointer {
             let _ = self.seat_state.get_pointer(qh, &seat);
+        }
+        if capability == Capability::Keyboard {
+            let _ = self.seat_state.get_keyboard(qh, &seat, None);
         }
     }
     fn remove_capability(

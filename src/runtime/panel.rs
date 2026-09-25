@@ -5,7 +5,7 @@ use smithay_client_toolkit::{
     compositor::CompositorState,
     shell::{
         WaylandSurface,
-        wlr_layer::{Anchor, Layer, LayerShell, LayerSurface},
+        wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerShell, LayerSurface},
     },
 };
 use wayland_client::QueueHandle;
@@ -160,6 +160,9 @@ impl Panel {
         layer.set_anchor(Anchor::TOP | Anchor::LEFT);
         layer.set_exclusive_zone(0);
         layer.set_size(1, 1);
+
+        layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+
         layer.wl_surface().commit();
 
         Ok(layer)
@@ -169,6 +172,7 @@ impl Panel {
         panel.visible = false;
         if let Some(ref mut layer) = panel.layer {
             layer.set_size(1, 1);
+            layer.wl_surface().commit();
         }
     }
 
@@ -176,6 +180,7 @@ impl Panel {
         panel.visible = true;
         if let Some(ref mut layer) = panel.layer {
             layer.set_size(240, 200);
+            layer.wl_surface().commit();
         }
     }
 
