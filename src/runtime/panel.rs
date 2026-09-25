@@ -121,7 +121,10 @@ impl Panel {
                     _ => format!("{:2}", day),
                 };
 
-                let id = if day as u32 == current_date.day() && month == current_date.month() {
+                let id = if day as u32 == current_date.day()
+                    && month == current_date.month()
+                    && year == current_date.year()
+                {
                     Some(String::from("highlight"))
                 } else {
                     None
@@ -149,6 +152,16 @@ impl Panel {
         }
     }
 
+    pub fn shift_month(&mut self, delta: i32, theme: &Theme) {
+        let total_months = self.year * 12 + (self.month as i32 - 1) + delta;
+
+        self.year = total_months.div_euclid(12);
+        self.month = (total_months.rem_euclid(12) + 1) as u32;
+
+        self.root = Panel::month_grid(self.year, self.month);
+        self.draw(theme);
+    }
+
     pub fn create(
         layer_shell: &LayerShell,
         compositor: &CompositorState,
@@ -168,17 +181,17 @@ impl Panel {
         Ok(layer)
     }
 
-    pub fn hide(panel: &mut Panel) {
-        panel.visible = false;
-        if let Some(ref mut layer) = panel.layer {
+    pub fn hide(&mut self) {
+        self.visible = false;
+        if let Some(ref mut layer) = self.layer {
             layer.set_size(1, 1);
             layer.wl_surface().commit();
         }
     }
 
-    pub fn show(panel: &mut Panel) {
-        panel.visible = true;
-        if let Some(ref mut layer) = panel.layer {
+    pub fn show(&mut self) {
+        self.visible = true;
+        if let Some(ref mut layer) = self.layer {
             layer.set_size(240, 200);
             layer.wl_surface().commit();
         }

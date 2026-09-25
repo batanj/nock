@@ -13,7 +13,7 @@ use smithay_client_toolkit::{
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        keyboard::KeyboardHandler,
+        keyboard::{KeyboardHandler, Keysym},
         pointer::{PointerEventKind, PointerHandler},
     },
     shell::{
@@ -278,7 +278,7 @@ impl KeyboardHandler for Nock {
         _surface: &wl_surface::WlSurface,
         _serial: u32,
         _raw: &[u32],
-        _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
+        _keysyms: &[Keysym],
     ) {
     }
 
@@ -300,12 +300,22 @@ impl KeyboardHandler for Nock {
         _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        if event.keysym == smithay_client_toolkit::seat::keyboard::Keysym::Escape
-            && let Some(panel) = &mut self.panel
+        if let Some(panel) = &mut self.panel
             && panel.visible
         {
-            Panel::hide(panel);
-            panel.draw(&self.theme);
+            match event.keysym {
+                Keysym::Escape => {
+                    Panel::hide(panel);
+                    panel.draw(&self.theme);
+                }
+                Keysym::Left => {
+                    panel.shift_month(-1, &self.theme);
+                }
+                Keysym::Right => {
+                    panel.shift_month(1, &self.theme);
+                }
+                _ => {}
+            }
         }
     }
 
@@ -427,28 +437,10 @@ impl PointerHandler for Nock {
                         if let Some(t) = Widget::hit(&panel.hit_items, x, y) {
                             match t.id.as_deref() {
                                 Some("prev") => {
-                                    panel.month = {
-                                        if panel.month == 1 {
-                                            panel.year -= 1;
-                                            12
-                                        } else {
-                                            panel.month.saturating_sub(1)
-                                        }
-                                    };
-                                    panel.root = Panel::month_grid(panel.year, panel.month);
-                                    panel.draw(&self.theme);
+                                    panel.shift_month(-1, &self.theme);
                                 }
                                 Some("next") => {
-                                    panel.month = {
-                                        if panel.month == 12 {
-                                            panel.year += 1;
-                                            1
-                                        } else {
-                                            panel.month.saturating_add(1)
-                                        }
-                                    };
-                                    panel.root = Panel::month_grid(panel.year, panel.month);
-                                    panel.draw(&self.theme);
+                                    panel.shift_month(1, &self.theme);
                                 }
                                 _ => {}
                             }
@@ -501,13 +493,13 @@ impl PointerHandler for Nock {
                                 if let Some(ref mut panel) = self.panel
                                     && panel.visible
                                 {
-                                    Panel::hide(panel);
+                                    panel.hide();
                                     panel.draw(&self.theme);
                                     continue;
                                 }
 
                                 if let Some(ref mut panel) = self.panel {
-                                    Panel::show(panel);
+                                    panel.show();
                                     panel.draw(&self.theme);
                                 }
                             }
