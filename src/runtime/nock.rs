@@ -14,7 +14,7 @@ use smithay_client_toolkit::{
     seat::{
         Capability, SeatHandler, SeatState,
         keyboard::{KeyboardHandler, Keysym},
-        pointer::{PointerEventKind, PointerHandler},
+        pointer::{AxisScroll, PointerEventKind, PointerHandler},
     },
     shell::{
         WaylandSurface,
@@ -92,6 +92,100 @@ impl Nock {
             if action == Paint && id == self.clock_id {
                 self.draw();
             }
+        }
+    }
+
+    fn on_bar_motion(&mut self, x: u32, y: u32) {
+        let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
+        if new != self.hover_id {
+            self.hover_id = new;
+            self.request_paint();
+        }
+    }
+
+    fn on_axis(&mut self, _x: u32, _y: u32, vertical: &AxisScroll) {
+        if vertical.absolute != 0.0 {
+            let delta = if vertical.absolute > 0.0 {
+                "5%+"
+            } else {
+                "5%-"
+            };
+
+            let _ = Command::new("wpctl")
+                .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", delta])
+                .status();
+
+            Widget::set_volume(&mut self.root, &volume_text());
+            self.request_paint();
+        }
+    }
+
+    fn on_bar_press(&mut self, x: u32, y: u32) {
+        let Some(t) = Widget::hit(&self.hit_items, x, y) else {
+            if let Some(panel) = self.panel.as_mut()
+                && panel.visible
+            {
+                panel.hide();
+                panel.draw(&self.theme);
+            }
+            return;
+        };
+
+        match t.on_click.as_deref() {
+            Some("toggle_theme") => {
+                if self.is_dark {
+                    self.theme = Theme::light();
+                    self.is_dark = false;
+                } else {
+                    self.theme = Theme::dark();
+                    self.is_dark = true;
+                }
+                self.request_paint();
+            }
+            Some("spawn") => {
+                let Some(cmd) = t.command.as_deref() else {
+                    eprintln!("nock: spawn missing command");
+                    return;
+                };
+
+                let mut bits = cmd.split_whitespace();
+                let Some(prog) = bits.next() else {
+                    eprintln!("nock: spawn missing command");
+                    return;
+                };
+
+                if let Err(e) = std::process::Command::new(prog).args(bits).spawn() {
+                    eprintln!("nock: spawn {cmd}: {e}");
+                }
+
+                if let Some(id) = &t.id
+                    && id == "volume"
+                {
+                    Widget::set_volume(&mut self.root, &volume_text());
+                    self.request_paint();
+                }
+            }
+            Some("toggle_clock") => {
+                self.hour12 = !self.hour12;
+                Widget::set_clock(&mut self.root, &format_now(self.hour12));
+                self.request_paint();
+            }
+            Some("toggle_panel") => {
+                if let Some(ref mut panel) = self.panel
+                    && panel.visible
+                {
+                    panel.hide();
+                    panel.draw(&self.theme);
+                    return;
+                }
+
+                if let Some(ref mut panel) = self.panel {
+                    panel.show();
+                    panel.draw(&self.theme);
+                }
+            }
+            Some(other) => eprintln!("unknown on_click {other}"),
+            None => {}
         }
     }
 }
@@ -305,7 +399,7 @@ impl KeyboardHandler for Nock {
         {
             match event.keysym {
                 Keysym::Escape => {
-                    Panel::hide(panel);
+                    panel.hide();
                     panel.draw(&self.theme);
                 }
                 Keysym::Left => {
@@ -374,11 +468,7 @@ impl PointerHandler for Nock {
                         continue;
                     }
 
-                    let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
-                    if new != self.hover_id {
-                        self.hover_id = new;
-                        self.request_paint();
-                    }
+                    self.on_bar_motion(x, y);
                 }
                 PointerEventKind::Leave { serial: _ } => {
                     if let Some(panel) = &mut self.panel
@@ -408,20 +498,7 @@ impl PointerHandler for Nock {
                         continue;
                     }
 
-                    if vertical.absolute != 0.0 {
-                        let delta = if vertical.absolute > 0.0 {
-                            "5%+"
-                        } else {
-                            "5%-"
-                        };
-
-                        let _ = Command::new("wpctl")
-                            .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", delta])
-                            .status();
-
-                        Widget::set_volume(&mut self.root, &volume_text());
-                        self.request_paint();
-                    }
+                    self.on_axis(x, y, vertical);
                 }
 
                 PointerEventKind::Press {
@@ -434,84 +511,13 @@ impl PointerHandler for Nock {
                         && let Some(layer) = &panel.layer
                         && &event.surface == layer.wl_surface()
                     {
-                        if let Some(t) = Widget::hit(&panel.hit_items, x, y) {
-                            match t.id.as_deref() {
-                                Some("prev") => {
-                                    panel.shift_month(-1, &self.theme);
-                                }
-                                Some("next") => {
-                                    panel.shift_month(1, &self.theme);
-                                }
-                                _ => {}
-                            }
-                        }
+                        panel.on_panel_press(x, y, &self.theme);
+
                         continue;
                     } else if event.surface != *self.layer_surface.wl_surface() {
                         continue;
-                    } else if let Some(t) = Widget::hit(&self.hit_items, x, y) {
-                        match t.on_click.as_deref() {
-                            Some("toggle_theme") => {
-                                if self.is_dark {
-                                    self.theme = Theme::light();
-                                    self.is_dark = false;
-                                } else {
-                                    self.theme = Theme::dark();
-                                    self.is_dark = true;
-                                }
-                                self.request_paint();
-                            }
-                            Some("spawn") => {
-                                let Some(cmd) = t.command.as_deref() else {
-                                    eprintln!("nock: spawn missing command");
-                                    continue;
-                                };
-
-                                let mut bits = cmd.split_whitespace();
-                                let Some(prog) = bits.next() else {
-                                    eprintln!("nock: spawn missing command");
-                                    continue;
-                                };
-
-                                if let Err(e) = std::process::Command::new(prog).args(bits).spawn()
-                                {
-                                    eprintln!("nock: spawn {cmd}: {e}");
-                                }
-
-                                if let Some(id) = &t.id
-                                    && id == "volume"
-                                {
-                                    Widget::set_volume(&mut self.root, &volume_text());
-                                    self.request_paint();
-                                }
-                            }
-                            Some("toggle_clock") => {
-                                self.hour12 = !self.hour12;
-                                Widget::set_clock(&mut self.root, &format_now(self.hour12));
-                                self.request_paint();
-                            }
-                            Some("toggle_panel") => {
-                                if let Some(ref mut panel) = self.panel
-                                    && panel.visible
-                                {
-                                    panel.hide();
-                                    panel.draw(&self.theme);
-                                    continue;
-                                }
-
-                                if let Some(ref mut panel) = self.panel {
-                                    panel.show();
-                                    panel.draw(&self.theme);
-                                }
-                            }
-                            Some(other) => eprintln!("unknown on_click {other}"),
-                            None => {}
-                        }
-                    } else if let Some(panel) = self.panel.as_mut()
-                        && panel.visible
-                    {
-                        Panel::hide(panel);
-                        panel.draw(&self.theme);
                     }
+                    self.on_bar_press(x, y);
                 }
                 _ => {}
             }

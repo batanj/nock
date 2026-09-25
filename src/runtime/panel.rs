@@ -181,6 +181,20 @@ impl Panel {
         Ok(layer)
     }
 
+    pub fn on_panel_press(&mut self, x: u32, y: u32, theme: &Theme) {
+        if let Some(t) = Widget::hit(&self.hit_items, x, y) {
+            match t.id.as_deref() {
+                Some("prev") => {
+                    self.shift_month(-1, theme);
+                }
+                Some("next") => {
+                    self.shift_month(1, theme);
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn hide(&mut self) {
         self.visible = false;
         if let Some(ref mut layer) = self.layer {
