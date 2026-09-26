@@ -22,7 +22,7 @@ use smithay_client_toolkit::{
     },
 };
 use wayland_client::{
-    Connection, Proxy, QueueHandle,
+    Connection, QueueHandle,
     protocol::{wl_output, wl_surface},
 };
 
@@ -31,7 +31,6 @@ use crate::{
     Action::Paint,
     SurfaceId, Widget,
     format::{format_now, volume_text},
-    gfx::egl::Egl,
     runtime::app::App,
     theme::Theme,
 };
@@ -230,42 +229,12 @@ impl LayerShellHandler for Nock {
         _serial: u32,
     ) {
         if Some(layer) == self.bar.layer_surface.as_ref() {
-            self.bar.configure(self.display_ptr, layer, configure);
+            self.bar.configure(configure, self.display_ptr, layer);
             self.request_paint();
         } else if let Some(p) = self.panel.as_mut()
             && Some(layer) == p.layer_surface.as_ref()
         {
-            let mut new_w = p.width;
-            let mut new_h = p.height;
-
-            if configure.new_size.0 > 0 {
-                new_w = configure.new_size.0;
-            }
-            if configure.new_size.1 > 0 {
-                new_h = configure.new_size.1;
-            }
-
-            let size_changed = new_w != p.width || new_h != p.height;
-
-            p.width = new_w;
-            p.height = new_h;
-
-            if p.egl.is_none() {
-                p.egl = Some(
-                    Egl::bind(
-                        self.display_ptr,
-                        layer.wl_surface().id(),
-                        p.width as i32,
-                        p.height as i32,
-                    )
-                    .expect("panel egl bind"),
-                );
-            } else if size_changed {
-                p.egl
-                    .as_mut()
-                    .map(|e| Some(e.resize(new_w as i32, new_h as i32)));
-            }
-
+            p.configure(configure, self.display_ptr, layer);
             p.draw(&self.theme);
             self.app.mark_dirty(p.id);
         }

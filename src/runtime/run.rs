@@ -9,14 +9,8 @@ use std::{
 use calloop::{EventLoop, channel, timer::Timer};
 use calloop_wayland_source::WaylandSource;
 use smithay_client_toolkit::{
-    compositor::CompositorState,
-    output::OutputState,
-    registry::RegistryState,
-    seat::SeatState,
-    shell::{
-        WaylandSurface,
-        wlr_layer::{Anchor, Layer, LayerShell},
-    },
+    compositor::CompositorState, output::OutputState, registry::RegistryState, seat::SeatState,
+    shell::wlr_layer::LayerShell,
 };
 use wayland_client::{Connection, globals::registry_queue_init};
 

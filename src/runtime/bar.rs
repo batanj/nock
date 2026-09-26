@@ -7,7 +7,7 @@ use smithay_client_toolkit::{
         wlr_layer::{Anchor, Layer, LayerShell, LayerSurface, LayerSurfaceConfigure},
     },
 };
-use wayland_client::{Proxy, QueueHandle, protocol::wl_surface::WlSurface};
+use wayland_client::{Proxy, QueueHandle};
 
 use crate::{
     SurfaceId, Widget,
@@ -50,9 +50,9 @@ impl Bar {
 
     pub fn configure(
         &mut self,
+        configure: LayerSurfaceConfigure,
         display_ptr: *mut c_void,
         layer_surface: &LayerSurface,
-        configure: LayerSurfaceConfigure,
     ) {
         let mut new_w = self.width;
         let mut new_h = self.height;
