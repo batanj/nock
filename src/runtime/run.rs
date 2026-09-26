@@ -1,3 +1,4 @@
+use crate::runtime::bar::Bar;
 use crate::runtime::panel::Panel;
 use std::{
     error::Error,
@@ -39,24 +40,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     let mut app = App::new();
 
-    let id = SurfaceId::new(1);
-    app.add_surface(id, FrameMode::Idle { animation_cap: 60 });
+    let bar_surface_id = SurfaceId::new(1);
+    app.add_surface(bar_surface_id, FrameMode::Idle { animation_cap: 60 });
 
     // init bar
     let layer_shell = LayerShell::bind(&globals, &qh)?;
-    let surface = compositor.create_surface(&qh);
-    let layer = layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("nock"), None);
-    layer.set_anchor(Anchor::TOP | Anchor::LEFT | Anchor::RIGHT);
-    layer.set_exclusive_zone(32);
-    layer.set_size(0, 32);
-    layer.wl_surface().commit();
+    let bar_layer_surface = Bar::create(&layer_shell, &compositor, &qh)?;
 
     // init panel
-    let panel_id = SurfaceId::new(2);
-    app.add_surface(panel_id, FrameMode::Idle { animation_cap: 60 });
-    let panel_layer = Some(Panel::create(&layer_shell, &compositor, &qh)?);
+    let panel_surface_id = SurfaceId::new(2);
+    app.add_surface(panel_surface_id, FrameMode::Idle { animation_cap: 60 });
+    let panel_layer_surface = Some(Panel::create(&layer_shell, &compositor, &qh)?);
 
-    let (root, meta) = load_root();
+    let (bar_root, meta) = load_root();
     let (config_file, config_mtime) = match meta {
         Some((p, t)) => (Some(p), Some(t)),
         None => (None, None),
@@ -64,24 +60,33 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     let mut nock = Nock {
         app,
-        clock_id: id,
+        clock_id: bar_surface_id,
         registry_state: RegistryState::new(&globals),
         compositor_state: compositor,
         exit: false,
         layer_shell,
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
-        layer_surface: layer,
         display_ptr,
-        width: 0,
-        height: 32,
-        egl: None,
-        panel: Some(Panel::new(panel_layer, None, 0, 0, panel_id)),
+        bar: Bar::new(
+            bar_surface_id,
+            Some(bar_layer_surface),
+            None,
+            0,
+            32,
+            bar_root,
+            vec![],
+        ),
+        panel: Some(Panel::new(
+            panel_layer_surface,
+            None,
+            0,
+            0,
+            panel_surface_id,
+        )),
         theme: Theme::dark(),
-        root,
         config_file,
         config_mtime,
-        hit_items: vec![],
         is_dark: true,
         hover_id: None,
         hour12: true,
@@ -107,9 +112,9 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
     handle
         .insert_source(channel_source, |event, _, nock| {
             if let channel::Event::Msg(network_string) = event {
-                Widget::set_network(&mut nock.root, &network_string);
+                Widget::set_network(&mut nock.bar.root, &network_string);
                 nock.app.mark_dirty(nock.clock_id);
-                nock.draw();
+                nock.bar.draw(&nock.theme, &nock.hover_id);
             }
         })
         .expect("Failed to insert channel source");
@@ -119,10 +124,10 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
             Timer::from_duration(Duration::from_secs(1)),
             move |deadline, _, nock| {
                 reload_if_changed(nock);
-                Widget::set_clock(&mut nock.root, &format_now(nock.hour12));
-                Widget::set_date(&mut nock.root, &format_date());
-                Widget::set_battery(&mut nock.root, &battery_text());
-                Widget::set_volume(&mut nock.root, &volume_text());
+                Widget::set_clock(&mut nock.bar.root, &format_now(nock.hour12));
+                Widget::set_date(&mut nock.bar.root, &format_date());
+                Widget::set_battery(&mut nock.bar.root, &battery_text());
+                Widget::set_volume(&mut nock.bar.root, &volume_text());
 
                 if Instant::now().duration_since(nock.last_net) > Duration::from_secs(10) {
                     nock.last_net = Instant::now();
@@ -139,7 +144,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
 
                 for (id, action) in nock.app.tick(deadline) {
                     if action == Paint && id == nock.clock_id {
-                        nock.draw();
+                        nock.bar.draw(&nock.theme, &nock.hover_id);
                     }
                 }
                 calloop::timer::TimeoutAction::ToDuration(Duration::from_secs(1))

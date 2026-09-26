@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub struct Panel {
-    pub layer: Option<LayerSurface>,
+    pub layer_surface: Option<LayerSurface>,
     pub egl: Option<Egl>,
     pub width: u32,
     pub height: u32,
@@ -33,7 +33,7 @@ pub struct Panel {
 
 impl Panel {
     pub fn new(
-        layer: Option<LayerSurface>,
+        layer_surface: Option<LayerSurface>,
         egl: Option<Egl>,
         width: u32,
         height: u32,
@@ -42,7 +42,7 @@ impl Panel {
         let cur = chrono::Local::now();
         let (year, month) = (cur.year(), cur.month());
         Self {
-            layer,
+            layer_surface,
             egl,
             width,
             height,
@@ -197,7 +197,7 @@ impl Panel {
 
     pub fn hide(&mut self) {
         self.visible = false;
-        if let Some(ref mut layer) = self.layer {
+        if let Some(ref mut layer) = self.layer_surface {
             layer.set_size(1, 1);
             layer.wl_surface().commit();
         }
@@ -205,7 +205,7 @@ impl Panel {
 
     pub fn show(&mut self) {
         self.visible = true;
-        if let Some(ref mut layer) = self.layer {
+        if let Some(ref mut layer) = self.layer_surface {
             layer.set_size(240, 200);
             layer.wl_surface().commit();
         }

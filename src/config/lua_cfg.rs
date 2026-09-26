@@ -66,7 +66,7 @@ pub fn reload_if_changed(nock: &mut Nock) {
         Some((p, t)) => (Some(p), Some(t)),
         None => (None, None),
     };
-    nock.root = root;
+    nock.bar.root = root;
     nock.config_mtime = config_mtime;
     nock.config_file = config_file;
 }
