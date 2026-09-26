@@ -230,40 +230,7 @@ impl LayerShellHandler for Nock {
         _serial: u32,
     ) {
         if Some(layer) == self.bar.layer_surface.as_ref() {
-            let mut new_w = self.bar.width;
-            let mut new_h = self.bar.height;
-
-            if configure.new_size.0 > 0 {
-                new_w = configure.new_size.0;
-            }
-            if configure.new_size.1 > 0 {
-                new_h = configure.new_size.1;
-            }
-
-            let size_changed = new_w != self.bar.width || new_h != self.bar.height;
-
-            self.bar.width = new_w;
-            self.bar.height = new_h;
-
-            if self.bar.egl.is_none() && self.bar.width > 0 && self.bar.height > 0 {
-                self.bar.egl = Some(
-                    Egl::bind(
-                        self.display_ptr,
-                        layer.wl_surface().id(),
-                        self.bar.width as i32,
-                        self.bar.height as i32,
-                    )
-                    .expect("egl bind"),
-                );
-            } else if let Some(ref mut egl) = self.bar.egl
-                && size_changed
-                && new_w > 0
-                && new_h > 0
-            {
-                egl.resize(self.bar.width as i32, self.bar.height as i32)
-                    .expect("egl resize");
-            }
-
+            self.bar.configure(self.display_ptr, layer, configure);
             self.request_paint();
         } else if let Some(p) = self.panel.as_mut()
             && Some(layer) == p.layer_surface.as_ref()

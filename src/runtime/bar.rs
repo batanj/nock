@@ -1,13 +1,13 @@
-use std::error::Error;
+use std::{error::Error, ffi::c_void};
 
 use smithay_client_toolkit::{
     compositor::CompositorState,
     shell::{
         WaylandSurface,
-        wlr_layer::{Anchor, Layer, LayerShell, LayerSurface},
+        wlr_layer::{Anchor, Layer, LayerShell, LayerSurface, LayerSurfaceConfigure},
     },
 };
-use wayland_client::QueueHandle;
+use wayland_client::{Proxy, QueueHandle, protocol::wl_surface::WlSurface};
 
 use crate::{
     SurfaceId, Widget,
@@ -45,6 +45,47 @@ impl Bar {
             height,
             root,
             hit_items,
+        }
+    }
+
+    pub fn configure(
+        &mut self,
+        display_ptr: *mut c_void,
+        layer_surface: &LayerSurface,
+        configure: LayerSurfaceConfigure,
+    ) {
+        let mut new_w = self.width;
+        let mut new_h = self.height;
+
+        if configure.new_size.0 > 0 {
+            new_w = configure.new_size.0;
+        }
+        if configure.new_size.1 > 0 {
+            new_h = configure.new_size.1;
+        }
+
+        let size_changed = new_w != self.width || new_h != self.height;
+
+        self.width = new_w;
+        self.height = new_h;
+
+        if self.egl.is_none() && self.width > 0 && self.height > 0 {
+            self.egl = Some(
+                Egl::bind(
+                    display_ptr,
+                    layer_surface.wl_surface().id(),
+                    self.width as i32,
+                    self.height as i32,
+                )
+                .expect("egl bind"),
+            );
+        } else if let Some(ref mut egl) = self.egl
+            && size_changed
+            && new_w > 0
+            && new_h > 0
+        {
+            egl.resize(self.width as i32, self.height as i32)
+                .expect("egl resize");
         }
     }
 
