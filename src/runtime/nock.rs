@@ -35,6 +35,8 @@ use crate::{
     theme::Theme,
 };
 
+use super::bar::BarAction;
+
 pub struct Nock {
     pub app: App,
     pub clock_id: SurfaceId,
@@ -92,56 +94,34 @@ impl Nock {
     }
 
     fn on_bar_press(&mut self, x: u32, y: u32) {
-        let Some(t) = Widget::hit(&self.bar.hit_items, x, y) else {
-            if let Some(panel) = self.panel.as_mut()
-                && panel.visible
-            {
-                panel.hide();
-                panel.draw(&self.theme);
-            }
-            return;
-        };
-
-        match t.on_click.as_deref() {
-            Some("toggle_theme") => {
-                if self.is_dark {
-                    self.theme = Theme::light();
-                    self.is_dark = false;
-                } else {
-                    self.theme = Theme::dark();
-                    self.is_dark = true;
+        match self.bar.action_at(x, y) {
+            BarAction::DismissPanel => {
+                if let Some(panel) = self.panel.as_mut()
+                    && panel.visible
+                {
+                    panel.hide();
+                    panel.draw(&self.theme);
                 }
-                self.request_paint();
             }
-            Some("spawn") => {
-                let Some(cmd) = t.command.as_deref() else {
-                    eprintln!("nock: spawn missing command");
-                    return;
-                };
-
-                let mut bits = cmd.split_whitespace();
-                let Some(prog) = bits.next() else {
-                    eprintln!("nock: spawn missing command");
-                    return;
-                };
+            BarAction::Spawn { command, id } => {
+                let mut bits = command.split_whitespace();
+                let Some(prog) = bits.next() else { return };
 
                 if let Err(e) = std::process::Command::new(prog).args(bits).spawn() {
-                    eprintln!("nock: spawn {cmd}: {e}");
+                    eprintln!("nock: spawn {command}: {e}");
                 }
 
-                if let Some(id) = &t.id
-                    && id == "volume"
-                {
+                if id.as_deref() == Some("volume") {
                     Widget::set_volume(&mut self.bar.root, &volume_text());
                     self.request_paint();
                 }
             }
-            Some("toggle_clock") => {
+            BarAction::ToggleClock => {
                 self.hour12 = !self.hour12;
                 Widget::set_clock(&mut self.bar.root, &format_now(self.hour12));
                 self.request_paint();
             }
-            Some("toggle_panel") => {
+            BarAction::TogglePanel => {
                 if let Some(ref mut panel) = self.panel
                     && panel.visible
                 {
@@ -155,8 +135,19 @@ impl Nock {
                     panel.draw(&self.theme);
                 }
             }
-            Some(other) => eprintln!("unknown on_click {other}"),
-            None => {}
+            BarAction::ToggleTheme => {
+                if self.is_dark {
+                    self.theme = Theme::light();
+                    self.is_dark = false;
+                } else {
+                    self.theme = Theme::dark();
+                    self.is_dark = true;
+                }
+                self.request_paint();
+            }
+            BarAction::None => {
+                eprintln!("hit something with no on_click")
+            }
         }
     }
 }

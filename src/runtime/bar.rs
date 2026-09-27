@@ -27,6 +27,15 @@ pub struct Bar {
     pub hit_items: Vec<HitTarget>,
 }
 
+pub enum BarAction {
+    ToggleTheme,
+    ToggleClock,
+    TogglePanel,
+    Spawn { command: String, id: Option<String> },
+    DismissPanel,
+    None,
+}
+
 impl Bar {
     pub fn new(
         surface_id: SurfaceId,
@@ -45,6 +54,30 @@ impl Bar {
             height,
             root,
             hit_items,
+        }
+    }
+
+    pub fn action_at(&self, x: u32, y: u32) -> BarAction {
+        let Some(t) = Widget::hit(&self.hit_items, x, y) else {
+            return BarAction::DismissPanel;
+        };
+
+        match t.on_click.as_deref() {
+            Some("toggle_theme") => BarAction::ToggleTheme,
+            Some("spawn") => {
+                let Some(cmd) = t.command.clone() else {
+                    eprintln!("nock: spawn missing command");
+                    return BarAction::None;
+                };
+
+                BarAction::Spawn {
+                    command: cmd,
+                    id: t.id.clone(),
+                }
+            }
+            Some("toggle_clock") => BarAction::ToggleClock,
+            Some("toggle_panel") => BarAction::TogglePanel,
+            _ => BarAction::None,
         }
     }
 
