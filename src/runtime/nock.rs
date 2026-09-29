@@ -26,7 +26,7 @@ use wayland_client::{
     protocol::{wl_output, wl_surface},
 };
 
-use crate::runtime::{bar::Bar, panel::Panel};
+use crate::runtime::{bar::Bar, menu::Menu, panel::Panel};
 use crate::{
     Action::Paint,
     SurfaceId, Widget,
@@ -56,6 +56,7 @@ pub struct Nock {
     pub hover_id: Option<String>,
     pub hour12: bool,
     pub last_net: Instant,
+    pub menu: Option<Menu>,
 }
 
 impl Nock {
@@ -93,14 +94,20 @@ impl Nock {
         }
     }
 
-    fn on_bar_press(&mut self, x: u32, y: u32) {
-        match self.bar.action_at(x, y) {
+    fn apply_action(&mut self, bar_action: BarAction) {
+        match bar_action {
             BarAction::DismissPanel => {
                 if let Some(panel) = self.panel.as_mut()
                     && panel.visible
                 {
                     panel.hide();
                     panel.draw(&self.theme);
+                }
+                if let Some(menu) = self.menu.as_mut()
+                    && menu.visible
+                {
+                    menu.hide();
+                    menu.draw(&self.theme);
                 }
             }
             BarAction::Spawn { command, id } => {
@@ -121,18 +128,32 @@ impl Nock {
                 Widget::set_clock(&mut self.bar.root, &format_now(self.hour12));
                 self.request_paint();
             }
-            BarAction::TogglePanel => {
-                if let Some(ref mut panel) = self.panel
-                    && panel.visible
-                {
-                    panel.hide();
-                    panel.draw(&self.theme);
-                    return;
+            BarAction::ToggleMenu => {
+                if let Some(ref mut menu) = self.menu {
+                    match menu.visible {
+                        true => menu.hide(),
+                        false => menu.show(),
+                    }
+                    menu.draw(&self.theme);
                 }
-
+            }
+            BarAction::TogglePanel => {
                 if let Some(ref mut panel) = self.panel {
-                    panel.show();
+                    match panel.visible {
+                        true => panel.hide(),
+                        false => panel.show(),
+                    }
                     panel.draw(&self.theme);
+                }
+            }
+            BarAction::NextMonth => {
+                if let Some(p) = self.panel.as_mut() {
+                    p.shift_month(1, &self.theme);
+                }
+            }
+            BarAction::PrevMonth => {
+                if let Some(p) = self.panel.as_mut() {
+                    p.shift_month(-1, &self.theme);
                 }
             }
             BarAction::ToggleTheme => {
@@ -145,9 +166,7 @@ impl Nock {
                 }
                 self.request_paint();
             }
-            BarAction::None => {
-                eprintln!("hit something with no on_click")
-            }
+            BarAction::None => {}
         }
     }
 }
@@ -228,6 +247,12 @@ impl LayerShellHandler for Nock {
             p.configure(configure, self.display_ptr, layer);
             p.draw(&self.theme);
             self.app.mark_dirty(p.id);
+        } else if let Some(m) = self.menu.as_mut()
+            && Some(layer) == m.layer_surface.as_ref()
+        {
+            m.configure(configure, self.display_ptr, layer);
+            m.draw(&self.theme);
+            self.app.mark_dirty(m.id);
         }
     }
 }
@@ -293,6 +318,15 @@ impl KeyboardHandler for Nock {
         _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
+        if let Some(menu) = &mut self.menu
+            && menu.visible
+            && event.keysym == Keysym::Escape
+        {
+            menu.hide();
+            menu.draw(&self.theme);
+            return;
+        }
+
         if let Some(panel) = &mut self.panel
             && panel.visible
         {
@@ -412,15 +446,21 @@ impl PointerHandler for Nock {
                         && let Some(layer) = &panel.layer_surface
                         && &event.surface == layer.wl_surface()
                     {
-                        panel.on_panel_press(x, y, &self.theme);
-
-                        continue;
-                    } else if let Some(layer_surface) = &mut self.bar.layer_surface
-                        && &event.surface != layer_surface.wl_surface()
+                        let action = panel.action_at(x, y);
+                        self.apply_action(action);
+                    } else if let Some(menu) = &mut self.menu
+                        && menu.visible
+                        && let Some(layer) = &menu.layer_surface
+                        && &event.surface == layer.wl_surface()
                     {
-                        continue;
+                        let action = menu.action_at(x, y);
+                        self.apply_action(action);
+                    } else if let Some(layer_surface) = &mut self.bar.layer_surface
+                        && &event.surface == layer_surface.wl_surface()
+                    {
+                        let action = self.bar.action_at(x, y);
+                        self.apply_action(action);
                     }
-                    self.on_bar_press(x, y);
                 }
                 _ => {}
             }

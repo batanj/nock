@@ -30,7 +30,10 @@ pub struct Bar {
 pub enum BarAction {
     ToggleTheme,
     ToggleClock,
+    ToggleMenu,
     TogglePanel,
+    PrevMonth,
+    NextMonth,
     Spawn { command: String, id: Option<String> },
     DismissPanel,
     None,
@@ -77,6 +80,7 @@ impl Bar {
             }
             Some("toggle_clock") => BarAction::ToggleClock,
             Some("toggle_panel") => BarAction::TogglePanel,
+            Some("toggle_menu") => BarAction::ToggleMenu,
             _ => BarAction::None,
         }
     }

@@ -16,7 +16,7 @@ use crate::{
     SurfaceId, Widget,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
-    runtime::nock::Nock,
+    runtime::{bar::BarAction, nock::Nock},
     theme::Theme,
 };
 
@@ -213,7 +213,7 @@ impl Panel {
         let panel_surface = compositor.create_surface(qh);
         let layer =
             layer_shell.create_layer_surface(qh, panel_surface, Layer::Top, Some("panel"), None);
-        layer.set_anchor(Anchor::TOP | Anchor::LEFT);
+        layer.set_anchor(Anchor::TOP);
         layer.set_exclusive_zone(0);
         layer.set_size(1, 1);
 
@@ -224,17 +224,11 @@ impl Panel {
         Ok(layer)
     }
 
-    pub fn on_panel_press(&mut self, x: u32, y: u32, theme: &Theme) {
-        if let Some(t) = Widget::hit(&self.hit_items, x, y) {
-            match t.id.as_deref() {
-                Some("prev") => {
-                    self.shift_month(-1, theme);
-                }
-                Some("next") => {
-                    self.shift_month(1, theme);
-                }
-                _ => {}
-            }
+    pub fn action_at(&mut self, x: u32, y: u32) -> BarAction {
+        match Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.as_deref()) {
+            Some("prev") => BarAction::PrevMonth,
+            Some("next") => BarAction::NextMonth,
+            _ => BarAction::None,
         }
     }
 

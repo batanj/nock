@@ -1,5 +1,5 @@
-use crate::runtime::bar::Bar;
 use crate::runtime::panel::Panel;
+use crate::runtime::{bar::Bar, menu::Menu};
 use std::{
     error::Error,
     ffi::c_void,
@@ -46,6 +46,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     app.add_surface(panel_surface_id, FrameMode::Idle { animation_cap: 60 });
     let panel_layer_surface = Some(Panel::create(&layer_shell, &compositor, &qh)?);
 
+    // init menu
+    let menu_surface_id = SurfaceId::new(3);
+    app.add_surface(menu_surface_id, FrameMode::Idle { animation_cap: 60 });
+    let menu_layer_surface = Some(Menu::create(&layer_shell, &compositor, &qh)?);
+
     let (bar_root, meta) = load_root();
     let (config_file, config_mtime) = match meta {
         Some((p, t)) => (Some(p), Some(t)),
@@ -78,6 +83,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             0,
             panel_surface_id,
         )),
+        menu: Some(Menu::new(menu_layer_surface, None, 0, 0, menu_surface_id)),
         theme: Theme::dark(),
         config_file,
         config_mtime,
