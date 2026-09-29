@@ -118,6 +118,13 @@ impl Nock {
                     eprintln!("nock: spawn {command}: {e}");
                 }
 
+                if let Some(menu) = self.menu.as_mut()
+                    && menu.visible
+                {
+                    menu.hide();
+                    menu.draw(&self.theme);
+                }
+
                 if id.as_deref() == Some("volume") {
                     Widget::set_volume(&mut self.bar.root, &volume_text());
                     self.request_paint();

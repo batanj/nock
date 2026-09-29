@@ -151,6 +151,18 @@ impl Menu {
         };
 
         match t.on_click.as_deref() {
+            Some("spawn") => {
+                let Some(cmd) = t.command.clone() else {
+                    eprintln!("nock: spawn missing command");
+                    return BarAction::None;
+                };
+
+                BarAction::Spawn {
+                    command: cmd,
+                    id: t.id.clone(),
+                }
+            }
+            Some("toggle_theme") => BarAction::ToggleTheme,
             Some("toggle_menu") => BarAction::ToggleMenu,
             _ => BarAction::None,
         }
@@ -158,13 +170,29 @@ impl Menu {
 
     pub fn menu() -> Widget {
         Widget::Column {
-            children: vec![Widget::Label {
-                text: "Menu".to_string(),
-                id: None,
-                on_click: None,
-                command: None,
-                pad: 8,
-            }],
+            children: vec![
+                Widget::Label {
+                    text: "Terminal".to_string(),
+                    id: Some("kitty".to_string()),
+                    on_click: Some("spawn".to_string()),
+                    command: Some("kitty".to_string()),
+                    pad: 8,
+                },
+                Widget::Label {
+                    text: "Theme".to_string(),
+                    id: Some("theme".to_string()),
+                    on_click: Some("toggle_theme".to_string()),
+                    command: None,
+                    pad: 8,
+                },
+                Widget::Label {
+                    text: "Close".to_string(),
+                    id: Some("close".to_string()),
+                    on_click: Some("toggle_menu".to_string()),
+                    command: None,
+                    pad: 8,
+                },
+            ],
         }
     }
 }
