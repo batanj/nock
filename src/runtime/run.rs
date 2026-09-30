@@ -60,16 +60,31 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
         display_ptr,
-        bar: Bar::new(bar_surface_id, Some(bar_layer_surface), None, 0, 32, vec![]),
+        bar: Bar::new(
+            bar_surface_id,
+            Some(bar_layer_surface),
+            None,
+            0,
+            32,
+            vec![],
+            Theme::dark(),
+        ),
         panel: Some(Panel::new(
             panel_layer_surface,
             None,
             0,
             0,
             panel_surface_id,
+            Theme::dark(),
         )),
-        menu: Some(Menu::new(menu_layer_surface, None, 0, 0, menu_surface_id)),
-        theme: Theme::dark(),
+        menu: Some(Menu::new(
+            menu_layer_surface,
+            None,
+            0,
+            0,
+            menu_surface_id,
+            Theme::dark(),
+        )),
         is_dark: true,
         hour12: true,
         last_net: Instant::now(),
@@ -96,7 +111,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
             if let channel::Event::Msg(network_string) = event {
                 Widget::set_network(&mut nock.bar.root, &network_string);
                 nock.app.mark_dirty(nock.clock_id);
-                nock.bar.draw(&nock.theme);
+                nock.bar.draw();
             }
         })
         .expect("Failed to insert channel source");
@@ -130,7 +145,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
 
                 for (id, action) in nock.app.tick(deadline) {
                     if action == Paint && id == nock.clock_id {
-                        nock.bar.draw(&nock.theme);
+                        nock.bar.draw();
                     }
                 }
                 calloop::timer::TimeoutAction::ToDuration(Duration::from_secs(1))

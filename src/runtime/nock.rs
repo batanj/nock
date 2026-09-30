@@ -43,7 +43,6 @@ pub struct Nock {
     pub exit: bool,
     pub bar: Bar,
     pub panel: Option<Panel>,
-    pub theme: Theme,
     pub is_dark: bool,
     pub hour12: bool,
     pub last_net: Instant,
@@ -64,7 +63,7 @@ impl Nock {
                 .status();
 
             Widget::set_volume(&mut self.bar.root, &volume_text());
-            self.bar.paint(&mut self.app, &self.theme);
+            self.bar.paint(&mut self.app);
         }
     }
 
@@ -75,13 +74,13 @@ impl Nock {
                     && panel.visible
                 {
                     panel.hide();
-                    panel.draw(&self.theme);
+                    panel.draw();
                 }
                 if let Some(menu) = self.menu.as_mut()
                     && menu.visible
                 {
                     menu.hide();
-                    menu.draw(&self.theme);
+                    menu.draw();
                 }
             }
             BarAction::Spawn { command, id } => {
@@ -96,18 +95,18 @@ impl Nock {
                     && menu.visible
                 {
                     menu.hide();
-                    menu.draw(&self.theme);
+                    menu.draw();
                 }
 
                 if id.as_deref() == Some("volume") {
                     Widget::set_volume(&mut self.bar.root, &volume_text());
-                    self.bar.paint(&mut self.app, &self.theme);
+                    self.bar.paint(&mut self.app);
                 }
             }
             BarAction::ToggleClock => {
                 self.hour12 = !self.hour12;
                 Widget::set_clock(&mut self.bar.root, &format_now(self.hour12));
-                self.bar.paint(&mut self.app, &self.theme);
+                self.bar.paint(&mut self.app);
             }
             BarAction::ToggleMenu => {
                 if let Some(ref mut menu) = self.menu {
@@ -115,7 +114,7 @@ impl Nock {
                         true => menu.hide(),
                         false => menu.show(),
                     }
-                    menu.draw(&self.theme);
+                    menu.draw();
                 }
             }
             BarAction::TogglePanel => {
@@ -124,28 +123,54 @@ impl Nock {
                         true => panel.hide(),
                         false => panel.show(),
                     }
-                    panel.draw(&self.theme);
+                    panel.draw();
                 }
             }
             BarAction::NextMonth => {
                 if let Some(p) = self.panel.as_mut() {
-                    p.shift_month(1, &self.theme);
+                    p.shift_month(1);
                 }
             }
             BarAction::PrevMonth => {
                 if let Some(p) = self.panel.as_mut() {
-                    p.shift_month(-1, &self.theme);
+                    p.shift_month(-1);
                 }
             }
             BarAction::ToggleTheme => {
                 if self.is_dark {
-                    self.theme = Theme::light();
+                    let theme = Theme::light();
+                    self.bar.theme = theme.clone();
+                    if let Some(m) = self.menu.as_mut() {
+                        m.theme = theme.clone();
+                        if m.visible {
+                            m.draw();
+                        }
+                    }
+                    if let Some(p) = self.panel.as_mut() {
+                        p.theme = theme;
+                        if p.visible {
+                            p.draw();
+                        }
+                    }
                     self.is_dark = false;
                 } else {
-                    self.theme = Theme::dark();
+                    let theme = Theme::dark();
+                    self.bar.theme = theme.clone();
+                    if let Some(m) = self.menu.as_mut() {
+                        m.theme = theme.clone();
+                        if m.visible {
+                            m.draw();
+                        }
+                    }
+                    if let Some(p) = self.panel.as_mut() {
+                        p.theme = theme.clone();
+                        if p.visible {
+                            p.draw();
+                        }
+                    }
                     self.is_dark = true;
                 }
-                self.bar.paint(&mut self.app, &self.theme);
+                self.bar.paint(&mut self.app);
             }
             BarAction::None => {}
         }
@@ -221,18 +246,18 @@ impl LayerShellHandler for Nock {
     ) {
         if Some(layer) == self.bar.layer_surface.as_ref() {
             self.bar.configure(configure, self.display_ptr, layer);
-            self.bar.paint(&mut self.app, &self.theme);
+            self.bar.paint(&mut self.app);
         } else if let Some(p) = self.panel.as_mut()
             && Some(layer) == p.layer_surface.as_ref()
         {
             p.configure(configure, self.display_ptr, layer);
-            p.draw(&self.theme);
+            p.draw();
             self.app.mark_dirty(p.id);
         } else if let Some(m) = self.menu.as_mut()
             && Some(layer) == m.layer_surface.as_ref()
         {
             m.configure(configure, self.display_ptr, layer);
-            m.draw(&self.theme);
+            m.draw();
             self.app.mark_dirty(m.surface_id);
         }
     }
@@ -304,7 +329,7 @@ impl KeyboardHandler for Nock {
             && event.keysym == Keysym::Escape
         {
             menu.hide();
-            menu.draw(&self.theme);
+            menu.draw();
             return;
         }
 
@@ -314,13 +339,13 @@ impl KeyboardHandler for Nock {
             match event.keysym {
                 Keysym::Escape => {
                     panel.hide();
-                    panel.draw(&self.theme);
+                    panel.draw();
                 }
                 Keysym::Left => {
-                    panel.shift_month(-1, &self.theme);
+                    panel.shift_month(-1);
                 }
                 Keysym::Right => {
-                    panel.shift_month(1, &self.theme);
+                    panel.shift_month(1);
                 }
                 _ => {}
             }
@@ -386,7 +411,7 @@ impl PointerHandler for Nock {
                         && layer.wl_surface() == &event.surface
                         && self.bar.on_motion(x, y)
                     {
-                        self.bar.paint(&mut self.app, &self.theme);
+                        self.bar.paint(&mut self.app);
                     }
 
                     if let Some(ref mut menu) = self.menu
@@ -394,7 +419,7 @@ impl PointerHandler for Nock {
                         && layer.wl_surface() == &event.surface
                         && menu.on_motion(x, y)
                     {
-                        menu.paint(&mut self.app, &self.theme);
+                        menu.paint(&mut self.app);
                     }
                 }
                 PointerEventKind::Leave { serial: _ } => {
@@ -407,13 +432,13 @@ impl PointerHandler for Nock {
                     }
 
                     if self.bar.hover_id.take().is_some() {
-                        self.bar.paint(&mut self.app, &self.theme);
+                        self.bar.paint(&mut self.app);
                     }
 
                     if let Some(ref mut menu) = self.menu
                         && menu.hover_id.take().is_some()
                     {
-                        menu.paint(&mut self.app, &self.theme);
+                        menu.paint(&mut self.app);
                     }
                 }
                 PointerEventKind::Axis {

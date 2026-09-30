@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Theme {
     pub bg: (f32, f32, f32),
     pub fg: (f32, f32, f32),

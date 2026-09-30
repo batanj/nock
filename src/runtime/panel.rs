@@ -31,6 +31,7 @@ pub struct Panel {
     pub year: i32,
     pub month: u32,
     pub hit_items: Vec<HitTarget>,
+    pub theme: Theme,
 }
 
 impl Panel {
@@ -40,6 +41,7 @@ impl Panel {
         width: u32,
         height: u32,
         id: SurfaceId,
+        theme: Theme,
     ) -> Self {
         let cur = chrono::Local::now();
         let (year, month) = (cur.year(), cur.month());
@@ -54,6 +56,7 @@ impl Panel {
             year,
             month,
             hit_items: vec![],
+            theme,
         }
     }
 
@@ -195,14 +198,14 @@ impl Panel {
         }
     }
 
-    pub fn shift_month(&mut self, delta: i32, theme: &Theme) {
+    pub fn shift_month(&mut self, delta: i32) {
         let total_months = self.year * 12 + (self.month as i32 - 1) + delta;
 
         self.year = total_months.div_euclid(12);
         self.month = (total_months.rem_euclid(12) + 1) as u32;
 
         self.root = Panel::month_grid(self.year, self.month);
-        self.draw(theme);
+        self.draw();
     }
 
     pub fn create(
@@ -248,7 +251,7 @@ impl Panel {
         }
     }
 
-    pub fn draw(&mut self, theme: &Theme) {
+    pub fn draw(&mut self) {
         if let Some(egl) = self.egl.as_mut() {
             let items = Widget::layout(
                 &self.root,
@@ -260,14 +263,14 @@ impl Panel {
             )
             .1;
             self.hit_items = items.clone();
-            egl.begin_frame(theme);
+            egl.begin_frame(&self.theme);
             for ht in items {
                 if let Some(id) = &ht.id
                     && id == &String::from("highlight")
                 {
                     egl.draw_label(&ht, &Theme::hover());
                 } else {
-                    egl.draw_label(&ht, theme);
+                    egl.draw_label(&ht, &self.theme);
                 }
             }
             egl.end_frame();

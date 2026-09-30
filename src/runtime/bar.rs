@@ -34,6 +34,7 @@ pub struct Bar {
     pub config_file: Option<PathBuf>,
     pub config_mtime: Option<SystemTime>,
     pub hover_id: Option<String>,
+    pub theme: Theme,
 }
 
 pub enum BarAction {
@@ -56,6 +57,7 @@ impl Bar {
         width: u32,
         height: u32,
         hit_items: Vec<HitTarget>,
+        theme: Theme,
     ) -> Self {
         let (root, config_file, config_mtime) = Bar::load_root();
         Self {
@@ -69,6 +71,7 @@ impl Bar {
             config_file,
             config_mtime,
             hover_id: None,
+            theme,
         }
     }
 
@@ -177,16 +180,16 @@ impl Bar {
         false
     }
 
-    pub fn paint(&mut self, app: &mut App, theme: &Theme) {
+    pub fn paint(&mut self, app: &mut App) {
         app.mark_dirty(self.surface_id);
         for (id, action) in app.tick(Instant::now()) {
             if action == Paint && id == self.surface_id {
-                self.draw(theme);
+                self.draw();
             }
         }
     }
 
-    pub fn draw(&mut self, theme: &Theme) {
+    pub fn draw(&mut self) {
         let Some(egl) = &mut self.egl else { return };
         let items = Widget::layout(
             &self.root,
@@ -198,12 +201,12 @@ impl Bar {
         )
         .1;
         self.hit_items = items.clone();
-        egl.begin_frame(theme);
+        egl.begin_frame(&self.theme);
         for ht in items {
             if ht.id.is_some() && ht.id == self.hover_id {
                 egl.draw_label(&ht, &Theme::hover());
             } else {
-                egl.draw_label(&ht, theme);
+                egl.draw_label(&ht, &self.theme);
             }
         }
         egl.end_frame();
