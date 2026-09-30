@@ -1,4 +1,10 @@
-use std::{error::Error, ffi::c_void, fs, path::PathBuf, time::SystemTime};
+use std::{
+    error::Error,
+    ffi::c_void,
+    fs,
+    path::PathBuf,
+    time::{Instant, SystemTime},
+};
 
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -12,11 +18,12 @@ use smithay_client_toolkit::{
 use wayland_client::{Proxy, QueueHandle};
 
 use crate::{
+    Action::Paint,
     SurfaceId, Widget,
     config::lua_cfg::load_root,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
-    runtime::{bar::BarAction, nock::Nock},
+    runtime::{app::App, bar::BarAction, nock::Nock},
     theme::Theme,
 };
 
@@ -25,12 +32,13 @@ pub struct Menu {
     pub egl: Option<Egl>,
     pub width: u32,
     pub height: u32,
-    pub id: SurfaceId,
+    pub surface_id: SurfaceId,
     pub root: Widget,
     pub visible: bool,
     pub hit_items: Vec<HitTarget>,
     pub config_file: Option<PathBuf>,
     pub config_mtime: Option<SystemTime>,
+    pub hover_id: Option<String>,
 }
 
 impl Menu {
@@ -39,7 +47,7 @@ impl Menu {
         egl: Option<Egl>,
         width: u32,
         height: u32,
-        id: SurfaceId,
+        surface_id: SurfaceId,
     ) -> Self {
         let (root, config_file, config_mtime) = Menu::load_root();
 
@@ -48,12 +56,13 @@ impl Menu {
             egl,
             width,
             height,
-            id,
+            surface_id,
             root,
             visible: false,
             hit_items: vec![],
             config_file,
             config_mtime,
+            hover_id: None,
         }
     }
 
@@ -132,6 +141,24 @@ impl Menu {
         }
     }
 
+    pub fn on_motion(&mut self, x: u32, y: u32) -> bool {
+        let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
+        if new != self.hover_id {
+            self.hover_id = new;
+            return true;
+        }
+        false
+    }
+
+    pub fn paint(&mut self, app: &mut App, theme: &Theme) {
+        app.mark_dirty(self.surface_id);
+        for (id, action) in app.tick(Instant::now()) {
+            if action == Paint && id == self.surface_id {
+                self.draw(theme);
+            }
+        }
+    }
+
     pub fn draw(&mut self, theme: &Theme) {
         if let Some(egl) = self.egl.as_mut() {
             let items = Widget::layout(
@@ -146,7 +173,11 @@ impl Menu {
             self.hit_items = items.clone();
             egl.begin_frame(theme);
             for ht in items {
-                egl.draw_label(&ht, theme);
+                if ht.id.is_some() && ht.id == self.hover_id {
+                    egl.draw_label(&ht, &Theme::hover());
+                } else {
+                    egl.draw_label(&ht, theme);
+                }
             }
             egl.end_frame();
         }

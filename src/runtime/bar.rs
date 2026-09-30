@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 use std::{error::Error, ffi::c_void};
 
 use smithay_client_toolkit::{
@@ -12,6 +12,8 @@ use smithay_client_toolkit::{
 };
 use wayland_client::{Proxy, QueueHandle};
 
+use crate::Action::Paint;
+use crate::runtime::app::App;
 use crate::{
     SurfaceId, Widget,
     config::lua_cfg::load_root,
@@ -31,6 +33,7 @@ pub struct Bar {
     pub hit_items: Vec<HitTarget>,
     pub config_file: Option<PathBuf>,
     pub config_mtime: Option<SystemTime>,
+    pub hover_id: Option<String>,
 }
 
 pub enum BarAction {
@@ -65,6 +68,7 @@ impl Bar {
             hit_items,
             config_file,
             config_mtime,
+            hover_id: None,
         }
     }
 
@@ -164,7 +168,25 @@ impl Bar {
         Ok(layer)
     }
 
-    pub fn draw(&mut self, theme: &Theme, hover_id: &Option<String>) {
+    pub fn on_motion(&mut self, x: u32, y: u32) -> bool {
+        let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
+        if new != self.hover_id {
+            self.hover_id = new;
+            return true;
+        }
+        false
+    }
+
+    pub fn paint(&mut self, app: &mut App, theme: &Theme) {
+        app.mark_dirty(self.surface_id);
+        for (id, action) in app.tick(Instant::now()) {
+            if action == Paint && id == self.surface_id {
+                self.draw(theme);
+            }
+        }
+    }
+
+    pub fn draw(&mut self, theme: &Theme) {
         let Some(egl) = &mut self.egl else { return };
         let items = Widget::layout(
             &self.root,
@@ -178,7 +200,7 @@ impl Bar {
         self.hit_items = items.clone();
         egl.begin_frame(theme);
         for ht in items {
-            if ht.id.is_some() && &ht.id == hover_id {
+            if ht.id.is_some() && ht.id == self.hover_id {
                 egl.draw_label(&ht, &Theme::hover());
             } else {
                 egl.draw_label(&ht, theme);

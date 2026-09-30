@@ -23,7 +23,6 @@ use wayland_client::{
 
 use crate::runtime::{bar::Bar, menu::Menu, panel::Panel};
 use crate::{
-    Action::Paint,
     SurfaceId, Widget,
     format::{format_now, volume_text},
     runtime::app::App,
@@ -46,30 +45,12 @@ pub struct Nock {
     pub panel: Option<Panel>,
     pub theme: Theme,
     pub is_dark: bool,
-    pub hover_id: Option<String>,
     pub hour12: bool,
     pub last_net: Instant,
     pub menu: Option<Menu>,
 }
 
 impl Nock {
-    fn request_paint(&mut self) {
-        self.app.mark_dirty(self.clock_id);
-        for (id, action) in self.app.tick(Instant::now()) {
-            if action == Paint && id == self.clock_id {
-                self.bar.draw(&self.theme, &self.hover_id);
-            }
-        }
-    }
-
-    fn on_bar_motion(&mut self, x: u32, y: u32) {
-        let new = Widget::hit(&self.bar.hit_items, x, y).and_then(|t| t.id.clone());
-        if new != self.hover_id {
-            self.hover_id = new;
-            self.request_paint();
-        }
-    }
-
     fn on_axis(&mut self, _x: u32, _y: u32, vertical: &AxisScroll) {
         if vertical.absolute != 0.0 {
             let delta = if vertical.absolute > 0.0 {
@@ -83,7 +64,7 @@ impl Nock {
                 .status();
 
             Widget::set_volume(&mut self.bar.root, &volume_text());
-            self.request_paint();
+            self.bar.paint(&mut self.app, &self.theme);
         }
     }
 
@@ -120,13 +101,13 @@ impl Nock {
 
                 if id.as_deref() == Some("volume") {
                     Widget::set_volume(&mut self.bar.root, &volume_text());
-                    self.request_paint();
+                    self.bar.paint(&mut self.app, &self.theme);
                 }
             }
             BarAction::ToggleClock => {
                 self.hour12 = !self.hour12;
                 Widget::set_clock(&mut self.bar.root, &format_now(self.hour12));
-                self.request_paint();
+                self.bar.paint(&mut self.app, &self.theme);
             }
             BarAction::ToggleMenu => {
                 if let Some(ref mut menu) = self.menu {
@@ -164,7 +145,7 @@ impl Nock {
                     self.theme = Theme::dark();
                     self.is_dark = true;
                 }
-                self.request_paint();
+                self.bar.paint(&mut self.app, &self.theme);
             }
             BarAction::None => {}
         }
@@ -240,7 +221,7 @@ impl LayerShellHandler for Nock {
     ) {
         if Some(layer) == self.bar.layer_surface.as_ref() {
             self.bar.configure(configure, self.display_ptr, layer);
-            self.request_paint();
+            self.bar.paint(&mut self.app, &self.theme);
         } else if let Some(p) = self.panel.as_mut()
             && Some(layer) == p.layer_surface.as_ref()
         {
@@ -252,7 +233,7 @@ impl LayerShellHandler for Nock {
         {
             m.configure(configure, self.display_ptr, layer);
             m.draw(&self.theme);
-            self.app.mark_dirty(m.id);
+            self.app.mark_dirty(m.surface_id);
         }
     }
 }
@@ -401,7 +382,20 @@ impl PointerHandler for Nock {
                         continue;
                     }
 
-                    self.on_bar_motion(x, y);
+                    if let Some(layer) = &self.bar.layer_surface
+                        && layer.wl_surface() == &event.surface
+                        && self.bar.on_motion(x, y)
+                    {
+                        self.bar.paint(&mut self.app, &self.theme);
+                    }
+
+                    if let Some(ref mut menu) = self.menu
+                        && let Some(ref mut layer) = menu.layer_surface
+                        && layer.wl_surface() == &event.surface
+                        && menu.on_motion(x, y)
+                    {
+                        menu.paint(&mut self.app, &self.theme);
+                    }
                 }
                 PointerEventKind::Leave { serial: _ } => {
                     if let Some(panel) = &mut self.panel
@@ -412,8 +406,14 @@ impl PointerHandler for Nock {
                         continue;
                     }
 
-                    if self.hover_id.take().is_some() {
-                        self.request_paint();
+                    if self.bar.hover_id.take().is_some() {
+                        self.bar.paint(&mut self.app, &self.theme);
+                    }
+
+                    if let Some(ref mut menu) = self.menu
+                        && menu.hover_id.take().is_some()
+                    {
+                        menu.paint(&mut self.app, &self.theme);
                     }
                 }
                 PointerEventKind::Axis {

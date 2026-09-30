@@ -6,10 +6,7 @@ use std::{
 
 use mlua::{Lua, Table};
 
-use crate::{
-    Widget,
-    runtime::{bar::Bar, nock::Nock},
-};
+use crate::Widget;
 
 fn config_path(root_widget: impl AsRef<Path>) -> Option<PathBuf> {
     config_candidates(root_widget)
@@ -62,27 +59,6 @@ pub fn load_root(root_widget: impl AsRef<Path>) -> (Option<Widget>, Option<(Path
         };
     }
     (None, None)
-}
-
-pub fn reload_if_changed(nock: &mut Nock) {
-    let Some(path) = nock.bar.config_file.as_ref() else {
-        return;
-    };
-    let Ok(modified) = fs::metadata(path).and_then(|m| m.modified()) else {
-        return;
-    };
-    if nock.bar.config_mtime.is_some_and(|t| modified <= t) {
-        return;
-    }
-
-    let (root, meta) = load_root("bar");
-    let (config_file, config_mtime) = match meta {
-        Some((p, t)) => (Some(p), Some(t)),
-        None => (None, None),
-    };
-    nock.bar.root = root.unwrap_or_else(Bar::default_row);
-    nock.bar.config_mtime = config_mtime;
-    nock.bar.config_file = config_file;
 }
 
 fn widget_from_lua(content: &str) -> Result<Widget, Box<dyn std::error::Error>> {
