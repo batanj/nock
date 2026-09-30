@@ -17,7 +17,6 @@ use wayland_client::{Connection, globals::registry_queue_init};
 use crate::{
     Action::Paint,
     FrameMode, SurfaceId, Widget,
-    config::lua_cfg::{load_root, reload_if_changed},
     format::{battery_text, format_date, format_now, network_text, volume_text},
     runtime::{app::App, nock::Nock},
     theme::Theme,
@@ -51,12 +50,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     app.add_surface(menu_surface_id, FrameMode::Idle { animation_cap: 60 });
     let menu_layer_surface = Some(Menu::create(&layer_shell, &compositor, &qh)?);
 
-    let (bar_root, meta) = load_root();
-    let (config_file, config_mtime) = match meta {
-        Some((p, t)) => (Some(p), Some(t)),
-        None => (None, None),
-    };
-
     let mut nock = Nock {
         app,
         clock_id: bar_surface_id,
@@ -67,15 +60,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
         display_ptr,
-        bar: Bar::new(
-            bar_surface_id,
-            Some(bar_layer_surface),
-            None,
-            0,
-            32,
-            bar_root,
-            vec![],
-        ),
+        bar: Bar::new(bar_surface_id, Some(bar_layer_surface), None, 0, 32, vec![]),
         panel: Some(Panel::new(
             panel_layer_surface,
             None,
@@ -85,8 +70,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         )),
         menu: Some(Menu::new(menu_layer_surface, None, 0, 0, menu_surface_id)),
         theme: Theme::dark(),
-        config_file,
-        config_mtime,
         is_dark: true,
         hover_id: None,
         hour12: true,
@@ -123,7 +106,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
         .insert_source(
             Timer::from_duration(Duration::from_secs(1)),
             move |deadline, _, nock| {
-                reload_if_changed(nock);
+                nock.bar.reload_if_changed();
                 Widget::set_clock(&mut nock.bar.root, &format_now(nock.hour12));
                 Widget::set_date(&mut nock.bar.root, &format_date());
                 Widget::set_battery(&mut nock.bar.root, &battery_text());

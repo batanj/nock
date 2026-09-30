@@ -1,4 +1,4 @@
-use std::{error::Error, ffi::c_void};
+use std::{error::Error, ffi::c_void, fs, path::PathBuf, time::SystemTime};
 
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -13,6 +13,7 @@ use wayland_client::{Proxy, QueueHandle};
 
 use crate::{
     SurfaceId, Widget,
+    config::lua_cfg::load_root,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
     runtime::{bar::BarAction, nock::Nock},
@@ -28,6 +29,8 @@ pub struct Menu {
     pub root: Widget,
     pub visible: bool,
     pub hit_items: Vec<HitTarget>,
+    pub config_file: Option<PathBuf>,
+    pub config_mtime: Option<SystemTime>,
 }
 
 impl Menu {
@@ -38,17 +41,37 @@ impl Menu {
         height: u32,
         id: SurfaceId,
     ) -> Self {
+        let (root, config_file, config_mtime) = Menu::load_root();
+
         Self {
             layer_surface,
             egl,
             width,
             height,
             id,
-            root: Menu::menu(),
+            root,
             visible: false,
             hit_items: vec![],
+            config_file,
+            config_mtime,
         }
     }
+
+    fn load_root() -> (Widget, Option<PathBuf>, Option<SystemTime>) {
+        let (root, meta) = load_root("menu");
+        let root = match root {
+            Some(widget) => widget,
+            None => Menu::default_column(),
+        };
+
+        let (config_file, config_mtime) = match meta {
+            Some((p, t)) => (Some(p), Some(t)),
+            None => (None, None),
+        };
+
+        (root, config_file, config_mtime)
+    }
+
     pub fn create(
         layer_shell: &LayerShell,
         compositor: &CompositorState,
@@ -168,7 +191,7 @@ impl Menu {
         }
     }
 
-    pub fn menu() -> Widget {
+    pub fn default_column() -> Widget {
         Widget::Column {
             children: vec![
                 Widget::Label {
@@ -194,5 +217,23 @@ impl Menu {
                 },
             ],
         }
+    }
+
+    pub fn reload_if_changed(&mut self) {
+        let Some(path) = self.config_file.as_ref() else {
+            return;
+        };
+        let Ok(modified) = fs::metadata(path).and_then(|m| m.modified()) else {
+            return;
+        };
+        if self.config_mtime.is_some_and(|t| modified <= t) {
+            return;
+        }
+
+        let (root, config_file, config_mtime) = Menu::load_root();
+
+        self.root = root;
+        self.config_mtime = config_mtime;
+        self.config_file = config_file;
     }
 }

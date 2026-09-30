@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::PathBuf;
+use std::time::SystemTime;
 use std::{error::Error, ffi::c_void};
 
 use smithay_client_toolkit::{
@@ -11,6 +14,7 @@ use wayland_client::{Proxy, QueueHandle};
 
 use crate::{
     SurfaceId, Widget,
+    config::lua_cfg::load_root,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
     runtime::nock::Nock,
@@ -25,6 +29,8 @@ pub struct Bar {
     pub height: u32,
     pub root: Widget,
     pub hit_items: Vec<HitTarget>,
+    pub config_file: Option<PathBuf>,
+    pub config_mtime: Option<SystemTime>,
 }
 
 pub enum BarAction {
@@ -46,9 +52,9 @@ impl Bar {
         egl: Option<Egl>,
         width: u32,
         height: u32,
-        root: Widget,
         hit_items: Vec<HitTarget>,
     ) -> Self {
+        let (root, config_file, config_mtime) = Bar::load_root();
         Self {
             surface_id,
             layer_surface,
@@ -57,7 +63,24 @@ impl Bar {
             height,
             root,
             hit_items,
+            config_file,
+            config_mtime,
         }
+    }
+
+    fn load_root() -> (Widget, Option<PathBuf>, Option<SystemTime>) {
+        let (root, meta) = load_root("bar");
+        let root = match root {
+            Some(widget) => widget,
+            None => Bar::default_row(),
+        };
+
+        let (config_file, config_mtime) = match meta {
+            Some((p, t)) => (Some(p), Some(t)),
+            None => (None, None),
+        };
+
+        (root, config_file, config_mtime)
     }
 
     pub fn action_at(&self, x: u32, y: u32) -> BarAction {
@@ -162,5 +185,52 @@ impl Bar {
             }
         }
         egl.end_frame();
+    }
+
+    pub fn default_row() -> Widget {
+        Widget::Row {
+            children: vec![
+                Widget::Label {
+                    text: "nock".into(),
+                    id: Some("brand".into()),
+                    on_click: Some("toggle_theme".to_string()),
+                    command: None,
+                    pad: 8,
+                },
+                Widget::Spacer,
+                Widget::Clock {
+                    text: "".into(),
+                    id: Some("clock".into()),
+                    on_click: None,
+                    command: None,
+                    pad: 8,
+                },
+                Widget::Date {
+                    text: "".into(),
+                    id: Some("date".into()),
+                    on_click: None,
+                    command: None,
+                    pad: 8,
+                },
+            ],
+        }
+    }
+
+    pub fn reload_if_changed(&mut self) {
+        let Some(path) = self.config_file.as_ref() else {
+            return;
+        };
+        let Ok(modified) = fs::metadata(path).and_then(|m| m.modified()) else {
+            return;
+        };
+        if self.config_mtime.is_some_and(|t| modified <= t) {
+            return;
+        }
+
+        let (root, config_file, config_mtime) = Bar::load_root();
+
+        self.root = root;
+        self.config_mtime = config_mtime;
+        self.config_file = config_file;
     }
 }
