@@ -252,7 +252,7 @@ impl LayerShellHandler for Nock {
         {
             p.configure(configure, self.display_ptr, layer);
             p.draw();
-            self.app.mark_dirty(p.id);
+            self.app.mark_dirty(p.surface_id);
         } else if let Some(m) = self.menu.as_mut()
             && Some(layer) == m.layer_surface.as_ref()
         {
@@ -399,11 +399,13 @@ impl PointerHandler for Nock {
 
             match &event.kind {
                 PointerEventKind::Motion { time: _ } => {
-                    if let Some(panel) = &mut self.panel
+                    if let Some(panel) = &mut self.panel.as_mut()
                         && panel.visible
                         && let Some(layer) = &panel.layer_surface
                         && &event.surface == layer.wl_surface()
+                        && panel.on_motion(x, y)
                     {
+                        panel.paint(&mut self.app);
                         continue;
                     }
 
@@ -427,7 +429,9 @@ impl PointerHandler for Nock {
                         && panel.visible
                         && let Some(layer) = &panel.layer_surface
                         && &event.surface == layer.wl_surface()
+                        && panel.hover_id.take().is_some()
                     {
+                        panel.paint(&mut self.app);
                         continue;
                     }
 

@@ -1,4 +1,5 @@
-use std::{error::Error, ffi::c_void};
+use crate::Action::Paint;
+use std::{error::Error, ffi::c_void, time::Instant};
 
 use chrono::{Datelike, NaiveDate};
 use smithay_client_toolkit::{
@@ -16,7 +17,7 @@ use crate::{
     SurfaceId, Widget,
     domain::{layout::Constraints, widget::HitTarget},
     gfx::egl::Egl,
-    runtime::{bar::BarAction, nock::Nock},
+    runtime::{app::App, bar::BarAction, nock::Nock},
     theme::Theme,
 };
 
@@ -25,13 +26,14 @@ pub struct Panel {
     pub egl: Option<Egl>,
     pub width: u32,
     pub height: u32,
-    pub id: SurfaceId,
+    pub surface_id: SurfaceId,
     pub root: Widget,
     pub visible: bool,
     pub year: i32,
     pub month: u32,
     pub hit_items: Vec<HitTarget>,
     pub theme: Theme,
+    pub hover_id: Option<String>,
 }
 
 impl Panel {
@@ -40,7 +42,7 @@ impl Panel {
         egl: Option<Egl>,
         width: u32,
         height: u32,
-        id: SurfaceId,
+        surface_id: SurfaceId,
         theme: Theme,
     ) -> Self {
         let cur = chrono::Local::now();
@@ -50,13 +52,14 @@ impl Panel {
             egl,
             width,
             height,
-            id,
+            surface_id,
             visible: false,
             root: Panel::month_grid(year, month),
             year,
             month,
             hit_items: vec![],
             theme,
+            hover_id: None,
         }
     }
 
@@ -227,6 +230,24 @@ impl Panel {
         Ok(layer)
     }
 
+    pub fn on_motion(&mut self, x: u32, y: u32) -> bool {
+        let new = Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.clone());
+        if new != self.hover_id {
+            self.hover_id = new;
+            return true;
+        }
+        false
+    }
+
+    pub fn paint(&mut self, app: &mut App) {
+        app.mark_dirty(self.surface_id);
+        for (id, action) in app.tick(Instant::now()) {
+            if action == Paint && id == self.surface_id {
+                self.draw();
+            }
+        }
+    }
+
     pub fn action_at(&mut self, x: u32, y: u32) -> BarAction {
         match Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.as_deref()) {
             Some("prev") => BarAction::PrevMonth,
@@ -265,13 +286,14 @@ impl Panel {
             self.hit_items = items.clone();
             egl.begin_frame(&self.theme);
             for ht in items {
-                if let Some(id) = &ht.id
-                    && id == &String::from("highlight")
-                {
-                    egl.draw_label(&ht, &Theme::hover());
+                let is_today = ht.id.as_deref() == Some("highlight");
+                let is_hover = self.hover_id.is_some() && ht.id == self.hover_id;
+                let theme = if is_today || is_hover {
+                    Theme::hover()
                 } else {
-                    egl.draw_label(&ht, &self.theme);
-                }
+                    self.theme.clone()
+                };
+                egl.draw_label(&ht, &theme);
             }
             egl.end_frame();
         }
