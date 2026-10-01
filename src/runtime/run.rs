@@ -126,7 +126,13 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
                 }
 
                 Widget::set_clock(&mut nock.bar.root, &format_now(nock.hour12));
-                Widget::set_date(&mut nock.bar.root, &format_date());
+
+                if let Some(panel) = &nock.panel
+                    && panel.selected_day.is_none()
+                {
+                    Widget::set_date(&mut nock.bar.root, &format_date());
+                }
+
                 Widget::set_battery(&mut nock.bar.root, &battery_text());
                 Widget::set_volume(&mut nock.bar.root, &volume_text());
 

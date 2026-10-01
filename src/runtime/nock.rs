@@ -138,6 +138,11 @@ impl Nock {
             }
             BarAction::SelectDay(day) => {
                 if let Some(p) = self.panel.as_mut() {
+                    if let Some(date) = chrono::NaiveDate::from_ymd_opt(p.year, p.month, day) {
+                        let text = date.format("%a %b %d").to_string();
+                        Widget::set_date(&mut self.bar.root, &text);
+                        self.bar.paint(&mut self.app);
+                    }
                     p.selected_day = Some(day);
                     p.draw();
                 }
