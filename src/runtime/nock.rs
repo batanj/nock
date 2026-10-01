@@ -136,6 +136,12 @@ impl Nock {
                     p.shift_month(-1);
                 }
             }
+            BarAction::SelectDay(day) => {
+                if let Some(p) = self.panel.as_mut() {
+                    p.selected_day = Some(day);
+                    p.draw();
+                }
+            }
             BarAction::ToggleTheme => {
                 if self.is_dark {
                     let theme = Theme::light();

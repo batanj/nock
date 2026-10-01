@@ -46,6 +46,7 @@ pub enum BarAction {
     NextMonth,
     Spawn { command: String, id: Option<String> },
     DismissPanel,
+    SelectDay(u32),
     None,
 }
 

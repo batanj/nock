@@ -34,6 +34,7 @@ pub struct Panel {
     pub hit_items: Vec<HitTarget>,
     pub theme: Theme,
     pub hover_id: Option<String>,
+    pub selected_day: Option<u32>,
 }
 
 impl Panel {
@@ -60,6 +61,7 @@ impl Panel {
             hit_items: vec![],
             theme,
             hover_id: None,
+            selected_day: None,
         }
     }
 
@@ -105,7 +107,6 @@ impl Panel {
     }
 
     pub fn month_grid(year: i32, month: u32) -> Widget {
-        let current_date = chrono::Local::now();
         let date = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
 
         let first_day = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
@@ -170,19 +171,13 @@ impl Panel {
                     _ => format!("{:2}", day),
                 };
 
-                let id = if day as u32 == current_date.day()
-                    && month == current_date.month()
-                    && year == current_date.year()
-                {
-                    Some(String::from("highlight"))
-                } else {
-                    None
-                };
+                let id = (!text.trim().is_empty()).then(|| format!("day-{}", day));
+                let on_click = id.clone();
 
                 Widget::Label {
                     text,
                     id,
-                    on_click: None,
+                    on_click,
                     command: None,
                     pad: day_pad,
                 }
@@ -204,6 +199,7 @@ impl Panel {
     pub fn shift_month(&mut self, delta: i32) {
         let total_months = self.year * 12 + (self.month as i32 - 1) + delta;
 
+        self.selected_day = None;
         self.year = total_months.div_euclid(12);
         self.month = (total_months.rem_euclid(12) + 1) as u32;
 
@@ -252,8 +248,18 @@ impl Panel {
         match Widget::hit(&self.hit_items, x, y).and_then(|t| t.id.as_deref()) {
             Some("prev") => BarAction::PrevMonth,
             Some("next") => BarAction::NextMonth,
+            Some(ref mut s) => match Panel::get_day_from_id(s) {
+                Some(day) => BarAction::SelectDay(day),
+                None => BarAction::None,
+            },
             _ => BarAction::None,
         }
+    }
+
+    fn get_day_from_id(id: impl AsRef<str>) -> Option<u32> {
+        id.as_ref()
+            .strip_prefix("day-")
+            .and_then(|d| d.parse::<u32>().ok())
     }
 
     pub fn hide(&mut self) {
@@ -286,9 +292,18 @@ impl Panel {
             self.hit_items = items.clone();
             egl.begin_frame(&self.theme);
             for ht in items {
-                let is_today = ht.id.as_deref() == Some("highlight");
+                let now = chrono::Local::now();
+                let is_today = ht
+                    .id
+                    .as_deref()
+                    .and_then(Panel::get_day_from_id)
+                    .is_some_and(|day| day == now.day())
+                    && self.month == now.month()
+                    && self.year == now.year();
                 let is_hover = self.hover_id.is_some() && ht.id == self.hover_id;
-                let theme = if is_today || is_hover {
+                let is_selected = self.selected_day.is_some()
+                    && ht.id.as_deref().and_then(Panel::get_day_from_id) == self.selected_day;
+                let theme = if is_today || is_hover || is_selected {
                     Theme::hover()
                 } else {
                     self.theme.clone()
