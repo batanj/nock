@@ -204,11 +204,12 @@ impl Bar {
         self.hit_items = items.clone();
         egl.begin_frame(&self.theme);
         for ht in items {
-            if ht.id.is_some() && ht.id == self.hover_id {
-                egl.draw_label(&ht, &Theme::hover());
+            let theme = if ht.id.is_some() && ht.id == self.hover_id {
+                &Theme::hover()
             } else {
-                egl.draw_label(&ht, &self.theme);
-            }
+                &self.theme
+            };
+            egl.draw_label(&ht, theme);
         }
         egl.end_frame();
     }

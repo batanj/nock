@@ -34,44 +34,58 @@ pub fn battery_text() -> String {
 
     let status = fs::read_to_string(path.join("status"))
         .ok()
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
     let charge = fs::read_to_string(path.join("capacity"))
         .ok()
-        .unwrap_or_default();
+        .and_then(|s| s.trim().parse::<u32>().ok());
 
-    match (charge, status) {
-        (ch, st) if !ch.is_empty() && !st.is_empty() => {
-            format!(
-                "{}%{}",
-                ch.trim(),
-                if st.trim() == "Charging" { "+" } else { "" }
-            )
-        }
-        (ch, _) => ch.to_string(),
-    }
+    let icon = match (charge, status.as_str()) {
+        (Some(0..=24), "Charging") => "󰢜",
+        (Some(25..=50), "Charging") => "󰂈",
+        (Some(51..=75), "Charging") => "󰂉",
+        (Some(76..=99), "Charging") => "󰂊",
+        (Some(100), "Charging") => "󰂄",
+
+        (Some(0..=24), "Discharging") => "󰁺",
+        (Some(25..=50), "Discharging") => "󰁻",
+        (Some(51..=75), "Discharging") => "󰁽",
+        (Some(76..=99), "Discharging") => "󰁿",
+        (Some(100), "Discharging") => "󰁹",
+
+        (Some(0..=99), "Not charging") => "󰚥",
+        (Some(100), "Not charging") => "󰂄",
+
+        _ => "󰂑",
+    };
+
+    icon.to_string()
 }
 
 pub fn volume_text() -> String {
-    match Command::new("wpctl")
+    let Ok(output) = Command::new("wpctl")
         .args(["get-volume", "@DEFAULT_AUDIO_SINK@"])
         .output()
-    {
-        Ok(output) => {
-            let text = String::from_utf8_lossy(&output.stdout);
-            let is_muted = text.contains("[MUTED]");
+    else {
+        return String::new();
+    };
 
-            let volume = text
-                .split_whitespace()
-                .find_map(|word| word.parse::<f32>().ok())
-                .map(|vol| (vol * 100.0).round() as u32);
+    let text = String::from_utf8_lossy(&output.stdout);
+    let is_muted = text.contains("[MUTED]");
 
-            match (volume, is_muted) {
-                (Some(vol), true) => format!("{} [MUTED]", vol),
-                (Some(vol), false) => vol.to_string(),
-                (None, _) => String::new(),
-            }
-        }
-        _ => String::new(),
+    let volume = text
+        .split_whitespace()
+        .find_map(|word| word.parse::<f32>().ok())
+        .map(|vol| (vol * 100.0).round() as u32);
+
+    match (volume, is_muted) {
+        (Some(0..=20), false) => String::from("󰕿"),
+        (Some(21..=50), false) => String::from("󰖀"),
+        (Some(51..=100), false) => String::from("󰕾"),
+        (Some(_), _) => String::from("󰝟"),
+        (None, _) => String::new(),
     }
 }
 
@@ -82,12 +96,12 @@ pub fn network_text() -> String {
     {
         Ok(output) => {
             let text = String::from_utf8_lossy(&output.stdout);
-
-            text.lines()
-                .find(|line| line.contains("yes:"))
-                .and_then(|line| line.strip_prefix("yes:").map(str::trim))
-                .unwrap_or_default()
-                .to_string()
+            if text.lines().any(|line| line.contains("yes:")) {
+                "󰖩"
+            } else {
+                "󰖪"
+            }
+            .to_string()
         }
         _ => String::new(),
     }
