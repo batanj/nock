@@ -106,3 +106,38 @@ pub fn network_text() -> String {
         _ => String::new(),
     }
 }
+
+pub fn brightness_text() -> String {
+    let Ok(current) = Command::new("brightnessctl").args(["g"]).output() else {
+        return String::new();
+    };
+
+    let Ok(max) = Command::new("brightnessctl").args(["m"]).output() else {
+        return String::new();
+    };
+
+    let parse_brightness = |output: &std::process::Output| -> f32 {
+        std::str::from_utf8(output.stdout.trim_ascii())
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_default()
+    };
+
+    let current_val = parse_brightness(&current);
+    let max_val = parse_brightness(&max);
+
+    if max_val <= 0.0 {
+        return String::new();
+    }
+
+    let percentage = (current_val / max_val) * 100.0;
+
+    let icon = match percentage as u32 {
+        0..=39 => "󰃞",
+        40..=74 => "󰃟",
+        75..=100 => "󰃠",
+        _ => "󰅚",
+    };
+
+    icon.to_string()
+}

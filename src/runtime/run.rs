@@ -1,3 +1,4 @@
+use crate::format::brightness_text;
 use crate::runtime::panel::Panel;
 use crate::runtime::{bar::Bar, menu::Menu};
 use std::{
@@ -135,6 +136,7 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
 
                 Widget::set_battery(&mut nock.bar.root, &battery_text());
                 Widget::set_volume(&mut nock.bar.root, &volume_text());
+                Widget::set_brightness(&mut nock.bar.root, &brightness_text());
 
                 if Instant::now().duration_since(nock.last_net) > Duration::from_secs(10) {
                     nock.last_net = Instant::now();

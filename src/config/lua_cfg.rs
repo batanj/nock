@@ -108,6 +108,13 @@ fn widget_from_table(table: &Table) -> Result<Widget, Box<dyn std::error::Error>
             command: table.get("command")?,
             pad: table.get("pad").unwrap_or(0),
         },
+        "brightness" => Widget::Brightness {
+            text: table.get("text").unwrap_or_else(|_| String::new()),
+            id: table.get("id")?,
+            on_click: table.get("on_click")?,
+            command: table.get("command")?,
+            pad: table.get("pad").unwrap_or(0),
+        },
         "network" => Widget::Network {
             text: table.get("text").unwrap_or_else(|_| String::new()),
             id: table.get("id")?,

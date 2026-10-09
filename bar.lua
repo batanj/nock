@@ -9,6 +9,7 @@ return {
         { kind = "label", text = "Kitty", id = "kitty", on_click = "spawn", command = "kitty --single-instance", pad = 8 },
         { kind = "battery", id = "battery", pad = 8 },
         { kind = "volume", id = "volume", on_click = "spawn", command = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", pad = 8 },
+        { kind = "brightness", id = "brightness", pad = 8 },
         { kind = "network", text = "󰖪", id = "network", pad = 8 },
         { kind = "label", text = "mode", id = "theme", on_click = "toggle_theme", pad = 8 },
     }

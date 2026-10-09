@@ -50,6 +50,12 @@ pub enum BarAction {
     None,
 }
 
+pub enum BarAxis {
+    Volume,
+    Brightness,
+    None,
+}
+
 impl Bar {
     pub fn new(
         surface_id: SurfaceId,
@@ -89,6 +95,18 @@ impl Bar {
         };
 
         (root, config_file, config_mtime)
+    }
+
+    pub fn axis_at(&self, x: u32, y: u32) -> BarAxis {
+        let Some(t) = Widget::hit(&self.hit_items, x, y) else {
+            return BarAxis::None;
+        };
+
+        match t.id.as_deref() {
+            Some("volume") => BarAxis::Volume,
+            Some("brightness") => BarAxis::Brightness,
+            _ => BarAxis::None,
+        }
     }
 
     pub fn action_at(&self, x: u32, y: u32) -> BarAction {

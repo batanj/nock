@@ -21,12 +21,19 @@ use wayland_client::{
     protocol::{wl_output, wl_surface},
 };
 
-use crate::runtime::{bar::Bar, menu::Menu, panel::Panel};
 use crate::{
     SurfaceId, Widget,
     format::{format_now, volume_text},
     runtime::app::App,
     theme::Theme,
+};
+use crate::{
+    format::brightness_text,
+    runtime::{
+        bar::{Bar, BarAxis},
+        menu::Menu,
+        panel::Panel,
+    },
 };
 
 use super::bar::BarAction;
@@ -50,20 +57,41 @@ pub struct Nock {
 }
 
 impl Nock {
-    fn on_axis(&mut self, _x: u32, _y: u32, vertical: &AxisScroll) {
-        if vertical.absolute != 0.0 {
-            let delta = if vertical.absolute > 0.0 {
-                "5%+"
-            } else {
-                "5%-"
-            };
+    fn apply_axis(&mut self, vertical: &AxisScroll, bar_axis: BarAxis) {
+        match bar_axis {
+            BarAxis::Volume => {
+                if vertical.absolute != 0.0 {
+                    let delta = if vertical.absolute > 0.0 {
+                        "1%+"
+                    } else {
+                        "1%-"
+                    };
 
-            let _ = Command::new("wpctl")
-                .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", delta])
-                .status();
+                    let _ = Command::new("wpctl")
+                        .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", delta])
+                        .status();
 
-            Widget::set_volume(&mut self.bar.root, &volume_text());
-            self.bar.paint(&mut self.app);
+                    Widget::set_volume(&mut self.bar.root, &volume_text());
+                    self.bar.paint(&mut self.app);
+                }
+            }
+            BarAxis::Brightness => {
+                if vertical.absolute != 0.0 {
+                    let delta = if vertical.absolute > 0.0 {
+                        "+1%"
+                    } else {
+                        "1%-"
+                    };
+
+                    let _ = Command::new("brightnessctl")
+                        .args(["-q", "s", delta])
+                        .status();
+
+                    Widget::set_brightness(&mut self.bar.root, &brightness_text());
+                    self.bar.paint(&mut self.app);
+                }
+            }
+            BarAxis::None => {}
         }
     }
 
@@ -467,13 +495,9 @@ impl PointerHandler for Nock {
                     {
                         continue;
                     }
-                    if Widget::hit(&self.bar.hit_items, x, y).and_then(|t| t.id.as_deref())
-                        != Some("volume")
-                    {
-                        continue;
-                    }
 
-                    self.on_axis(x, y, vertical);
+                    let axis = self.bar.axis_at(x, y);
+                    self.apply_axis(vertical, axis);
                 }
 
                 PointerEventKind::Press {
