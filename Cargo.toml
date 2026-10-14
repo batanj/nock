@@ -13,6 +13,7 @@ wayland-egl = "0.32"
 khronos-egl = { version = "6", features = ["dynamic"] }
 chrono = "0.4.45"
 mlua = { version = "0.12.1", features = ["lua54"] }
+thiserror = "2.0.21"
 
 [[example]]
 name = "layer_shm"

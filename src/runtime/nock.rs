@@ -23,6 +23,7 @@ use wayland_client::{
 
 use crate::{
     SurfaceId, Widget,
+    error::AppError,
     format::{format_now, volume_text},
     runtime::app::App,
     theme::Theme,
@@ -57,7 +58,7 @@ pub struct Nock {
 }
 
 impl Nock {
-    fn apply_axis(&mut self, vertical: &AxisScroll, bar_axis: BarAxis) {
+    fn apply_axis(&mut self, vertical: &AxisScroll, bar_axis: BarAxis) -> Result<(), AppError> {
         match bar_axis {
             BarAxis::Volume => {
                 if vertical.absolute != 0.0 {
@@ -71,7 +72,7 @@ impl Nock {
                         .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", delta])
                         .status();
 
-                    Widget::set_volume(&mut self.bar.root, &volume_text());
+                    Widget::set_volume(&mut self.bar.root, &volume_text()?);
                     self.bar.paint(&mut self.app);
                 }
             }
@@ -87,12 +88,14 @@ impl Nock {
                         .args(["-q", "s", delta])
                         .status();
 
-                    Widget::set_brightness(&mut self.bar.root, &brightness_text());
+                    Widget::set_brightness(&mut self.bar.root, &brightness_text()?);
                     self.bar.paint(&mut self.app);
                 }
             }
             BarAxis::None => {}
         }
+
+        Ok(())
     }
 
     fn apply_action(&mut self, bar_action: BarAction) {
@@ -127,7 +130,9 @@ impl Nock {
                 }
 
                 if id.as_deref() == Some("volume") {
-                    Widget::set_volume(&mut self.bar.root, &volume_text());
+                    let volume =
+                        AppError::log_and_fallback(volume_text(), "volume", "󰖁 Muted".to_string());
+                    Widget::set_volume(&mut self.bar.root, &volume);
                     self.bar.paint(&mut self.app);
                 }
             }
@@ -497,7 +502,7 @@ impl PointerHandler for Nock {
                     }
 
                     let axis = self.bar.axis_at(x, y);
-                    self.apply_axis(vertical, axis);
+                    let _ = self.apply_axis(vertical, axis);
                 }
 
                 PointerEventKind::Press {

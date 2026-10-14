@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::format::brightness_text;
 use crate::runtime::panel::Panel;
 use crate::runtime::{bar::Bar, menu::Menu};
@@ -134,9 +135,17 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
                     Widget::set_date(&mut nock.bar.root, &format_date());
                 }
 
-                Widget::set_battery(&mut nock.bar.root, &battery_text());
-                Widget::set_volume(&mut nock.bar.root, &volume_text());
-                Widget::set_brightness(&mut nock.bar.root, &brightness_text());
+                let battery =
+                    AppError::log_and_fallback(battery_text(), "battery", "󰂑".to_string());
+                Widget::set_battery(&mut nock.bar.root, &battery);
+
+                let volume =
+                    AppError::log_and_fallback(volume_text(), "volume", "󰖁 Muted".to_string());
+                Widget::set_volume(&mut nock.bar.root, &volume);
+
+                let brightness =
+                    AppError::log_and_fallback(brightness_text(), "brightness", "0".to_string());
+                Widget::set_brightness(&mut nock.bar.root, &brightness);
 
                 if Instant::now().duration_since(nock.last_net) > Duration::from_secs(10) {
                     nock.last_net = Instant::now();
@@ -144,7 +153,8 @@ pub fn clock(event_loop: &mut EventLoop<Nock>) {
                     let sender_clone = sender.clone();
 
                     std::thread::spawn(move || {
-                        let text = network_text();
+                        let text =
+                            AppError::log_and_fallback(network_text(), "network", "󰖪".to_string());
                         let _ = sender_clone.send(text);
                     });
                 }
